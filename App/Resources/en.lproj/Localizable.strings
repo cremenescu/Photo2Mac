@@ -119,6 +119,14 @@
 "Workspace gol" = "Workspace empty";
 "Trage o imagine aici, sau Cmd+O." = "Drop an image here, or press Cmd+O.";
 
+// MARK: - Empty inspector placeholders
+"Deschide o imagine pentru a ajusta." = "Open an image to adjust.";
+"Deschide o imagine pentru rotire." = "Open an image to rotate.";
+"Deschide o imagine pentru decupare." = "Open an image to crop.";
+"Deschide o imagine pentru a vedea metadatele." = "Open an image to view metadata.";
+"• Flip H" = "• Flip H";
+"• Flip V" = "• Flip V";
+
 // MARK: - Settings
 "Vizualizare" = "Display";
 "Zoom initial la deschidere" = "Default zoom on open";

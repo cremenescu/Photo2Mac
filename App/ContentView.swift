@@ -11,8 +11,8 @@ enum EditorTool: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .hand: return t("Mutare")
-        case .crop: return t(t("Decupare"))
-        case .rotate: return t(t("Rotire"))
+        case .crop: return t("Decupare")
+        case .rotate: return t("Rotire")
         case .tune: return t("Ajustari")
         case .text: return t("Text")
         case .arrow: return t("Sageata")
@@ -547,7 +547,7 @@ struct InspectorView: View {
                     if let doc = workspace.selected {
                         TuneInspector(doc: doc, tool: $tool)
                     } else {
-                        Text("Deschide o imagine pentru a ajusta.")
+                        Text(t("Deschide o imagine pentru a ajusta."))
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     }
@@ -555,7 +555,7 @@ struct InspectorView: View {
                     if let doc = workspace.selected {
                         RotateInspector(doc: doc, tool: $tool)
                     } else {
-                        Text("Deschide o imagine pentru rotire.")
+                        Text(t("Deschide o imagine pentru rotire."))
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     }
@@ -563,7 +563,7 @@ struct InspectorView: View {
                     if let doc = workspace.selected {
                         CropInspector(doc: doc, holder: cropHolder, tool: $tool)
                     } else {
-                        Text("Deschide o imagine pentru decupare.")
+                        Text(t("Deschide o imagine pentru decupare."))
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     }
@@ -571,7 +571,7 @@ struct InspectorView: View {
                     if let doc = workspace.selected {
                         MetadataInspector(doc: doc)
                     } else {
-                        Text("Deschide o imagine pentru a vedea metadatele.")
+                        Text(t("Deschide o imagine pentru a vedea metadatele."))
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     }
@@ -755,6 +755,63 @@ struct AspectPicker: View {
     }
 }
 
+private struct CropInspectorActive: View {
+    @ObservedObject var state: CropEditState
+    let onApply: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AspectPicker(state: state)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(t("Dreptunghi (pixeli)"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(String(format: "%d, %d  •  %d × %d",
+                            Int(state.rect.minX), Int(state.rect.minY),
+                            Int(state.rect.width), Int(state.rect.height)))
+                    .font(.callout)
+                    .monospacedDigit()
+            }
+
+            Divider().padding(.vertical, 4)
+
+            HStack {
+                Button(t("Anuleaza")) { onCancel() }
+                Spacer()
+                Button(t("Aplica")) { onApply() }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!hasPendingChanges)
+            }
+
+            Button {
+                state.aspect = .free
+                state.rect = CGRect(origin: .zero, size: state.imageSize)
+            } label: {
+                Text(t("Reseteaza"))
+                    .frame(maxWidth: .infinity)
+            }
+            .help(t("Reseteaza dreptunghiul la imaginea intreaga"))
+            .padding(.top, 4)
+        }
+    }
+
+    /// Apply enabled only when the crop rect differs from where it was when
+    /// the user entered the tool (or "full image" if no prior crop).
+    private var hasPendingChanges: Bool {
+        let n = state.normalized
+        let base: CropRect = state.originalStackCrop
+            ?? CropRect(x: 0, y: 0, width: 1, height: 1)
+        let eps = 0.001
+        return abs(n.x - base.x) > eps
+            || abs(n.y - base.y) > eps
+            || abs(n.width - base.width) > eps
+            || abs(n.height - base.height) > eps
+    }
+}
+
 struct CropInspector: View {
     @ObservedObject var doc: OpenImage
     @ObservedObject var holder: CropEditHolder
@@ -767,45 +824,12 @@ struct CropInspector: View {
                 .foregroundStyle(.secondary)
 
             if let state = holder.state {
-                AspectPicker(state: state)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(t("Dreptunghi (pixeli)"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(String(format: "%d, %d  •  %d × %d",
-                                Int(state.rect.minX), Int(state.rect.minY),
-                                Int(state.rect.width), Int(state.rect.height)))
-                        .font(.callout)
-                        .monospacedDigit()
-                }
+                // Sub-view observes state directly so rect/aspect changes
+                // refresh the Apply disabled state and rect readout live.
+                CropInspectorActive(state: state,
+                                     onApply: applyCrop,
+                                     onCancel: cancelCrop)
             }
-
-            Divider().padding(.vertical, 4)
-
-            HStack {
-                Button(t("Anuleaza")) {
-                    cancelCrop()
-                }
-                Spacer()
-                Button(t("Aplica")) {
-                    applyCrop()
-                }
-                .keyboardShortcut(.return, modifiers: [])
-                .buttonStyle(.borderedProminent)
-            }
-
-            Button {
-                if let s = holder.state {
-                    s.aspect = .free
-                    s.rect = CGRect(origin: .zero, size: s.imageSize)
-                }
-            } label: {
-                Text(t("Reseteaza"))
-                    .frame(maxWidth: .infinity)
-            }
-            .help(t("Reseteaza dreptunghiul la imaginea intreaga"))
-            .padding(.top, 4)
         }
         .onAppear {
             ensureCropState()
@@ -956,12 +980,12 @@ struct RotateInspector: View {
                         .font(.callout)
                         .monospacedDigit()
                     if doc.stack.flipHorizontal {
-                        Text("• Flip H")
+                        Text(t("• Flip H"))
                             .font(.callout)
                             .foregroundStyle(Color.accentColor)
                     }
                     if doc.stack.flipVertical {
-                        Text("• Flip V")
+                        Text(t("• Flip V"))
                             .font(.callout)
                             .foregroundStyle(Color.accentColor)
                     }
@@ -1012,7 +1036,8 @@ struct RotateInspector: View {
         if let snap = preToolSnap, snap != doc.stack {
             doc.commitSnapshot(snap)
         }
-        preToolSnap = doc.stack
+        preToolSnap = nil
+        tool = .hand
     }
 
     private func cancel() {
@@ -1136,7 +1161,8 @@ struct TuneInspector: View {
         if let snap = preToolSnap, snap != doc.stack {
             doc.commitSnapshot(snap)
         }
-        preToolSnap = doc.stack  // new baseline; stay in tool
+        preToolSnap = nil
+        tool = .hand
     }
 
     private func cancel() {

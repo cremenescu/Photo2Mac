@@ -105,6 +105,13 @@
 "Workspace gol" = "Workspace gol";
 "Trage o imagine aici, sau Cmd+O." = "Trage o imagine aici, sau Cmd+O.";
 
+"Deschide o imagine pentru a ajusta." = "Deschide o imagine pentru a ajusta.";
+"Deschide o imagine pentru rotire." = "Deschide o imagine pentru rotire.";
+"Deschide o imagine pentru decupare." = "Deschide o imagine pentru decupare.";
+"Deschide o imagine pentru a vedea metadatele." = "Deschide o imagine pentru a vedea metadatele.";
+"• Flip H" = "• Flip H";
+"• Flip V" = "• Flip V";
+
 "Vizualizare" = "Vizualizare";
 "Zoom initial la deschidere" = "Zoom initial la deschidere";
 "Re-aplica modul la redimensionarea ferestrei" = "Re-aplica modul la redimensionarea ferestrei";
