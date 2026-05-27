@@ -195,7 +195,22 @@ private struct EditsListButtonActive: View {
             EditsListView(doc: doc)
                 .frame(width: 320)
         }
+        // Auto-dismiss when the user opens a menu bar menu or invokes a
+        // command that posts the global dismiss-popovers notification (e.g.
+        // Save via Cmd+S brings up a modal panel).
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSMenu.didBeginTrackingNotification)) { _ in
+            presented = false
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .photo2MacDismissPopovers)) { _ in
+            presented = false
+        }
     }
+}
+
+extension Notification.Name {
+    static let photo2MacDismissPopovers = Notification.Name("Photo2Mac.dismissPopovers")
 }
 
 /// Undo/Redo toolbar buttons that observe the current document's history so

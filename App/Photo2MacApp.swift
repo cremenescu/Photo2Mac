@@ -81,6 +81,7 @@ struct SaveCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .saveItem) {
             Button(t("Salveaza")) {
+                NotificationCenter.default.post(name: .photo2MacDismissPopovers, object: nil)
                 if let doc = workspace.selected {
                     _ = SaveService.saveInPlace(doc: doc)
                 }
@@ -89,6 +90,7 @@ struct SaveCommands: Commands {
             .disabled(workspace.selected == nil)
 
             Button(t("Salveaza ca...")) {
+                NotificationCenter.default.post(name: .photo2MacDismissPopovers, object: nil)
                 if let doc = workspace.selected {
                     _ = SaveService.saveAs(doc: doc)
                 }
