@@ -50,6 +50,9 @@ targets:
         CFBundleIdentifier: "$(PRODUCT_BUNDLE_IDENTIFIER)"
         CFBundlePackageType: APPL
         CFBundleDevelopmentRegion: en
+        CFBundleLocalizations:
+          - en
+          - ro
         LSMinimumSystemVersion: "14.0"
         LSApplicationCategoryType: public.app-category.photography
         NSHumanReadableCopyright: "Copyright (c) 2026 Razvan Cremenescu. GPL-2.0-or-later."

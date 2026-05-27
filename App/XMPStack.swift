@@ -132,34 +132,36 @@ enum XMPStack {
         return CGImageMetadataSetTagWithPath(md, nil, path, tag)
     }
 
-    /// One-line human-readable summary of the edits applied.
+    /// One-line human-readable summary of the edits applied. Always English —
+    /// this lives in the file metadata and is read by tools / people anywhere,
+    /// so we keep it locale-independent regardless of the app's UI language.
     private static func humanDescription(of s: EditStack, creator: String) -> String {
         if s.isNeutral {
-            return "\(creator) — fara editari"
+            return "\(creator) — no edits"
         }
         var parts: [String] = []
         if abs(s.rotateDegrees) > 0.0001 {
-            parts.append(String(format: "rotire %.2f°", s.rotateDegrees))
+            parts.append(String(format: "rotate %.2f°", s.rotateDegrees))
         }
-        if s.flipHorizontal { parts.append("flip orizontal") }
+        if s.flipHorizontal { parts.append("flip horizontal") }
         if s.flipVertical { parts.append("flip vertical") }
         if let c = s.crop {
-            parts.append(String(format: "decupare %d%%×%d%% la (%d%%, %d%%)",
+            parts.append(String(format: "crop %d%%×%d%% at (%d%%, %d%%)",
                                  Int(c.width * 100), Int(c.height * 100),
                                  Int(c.x * 100), Int(c.y * 100)))
         }
         let adj = s.adjustments
         if adj.brightness != 0 {
-            parts.append(String(format: "luminozitate %+d", Int((adj.brightness * 100).rounded())))
+            parts.append(String(format: "brightness %+d", Int((adj.brightness * 100).rounded())))
         }
         if adj.contrast != 0 {
             parts.append(String(format: "contrast %+d", Int((adj.contrast * 100).rounded())))
         }
         if adj.saturation != 0 {
-            parts.append(String(format: "saturatie %+d", Int((adj.saturation * 100).rounded())))
+            parts.append(String(format: "saturation %+d", Int((adj.saturation * 100).rounded())))
         }
         if adj.exposure != 0 {
-            parts.append(String(format: "expunere %+.2f EV", adj.exposure))
+            parts.append(String(format: "exposure %+.2f EV", adj.exposure))
         }
         return "\(creator) — " + parts.joined(separator: ", ")
     }

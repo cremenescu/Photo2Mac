@@ -1,0 +1,134 @@
+/* Photo2Mac — Romanian. Key = value because the source code already uses
+   the Romanian string as the lookup key. Translations go on the right. */
+
+"Photo2Mac" = "Photo2Mac";
+"Photo2Mac Settings" = "Preferinte Photo2Mac";
+
+"Mutare" = "Mutare";
+"Decupare" = "Decupare";
+"Rotire" = "Rotire";
+"Ajustari" = "Ajustari";
+"Text" = "Text";
+"Sageata" = "Sageata";
+"Dreptunghi" = "Dreptunghi";
+"Blur" = "Blur";
+"Metadate" = "Metadate";
+
+"Micsoreaza" = "Micsoreaza";
+"Mareste" = "Mareste";
+"Marime reala (100%%)" = "Marime reala (100%%)";
+"Mod vizualizare" = "Mod vizualizare";
+"Inspector" = "Inspector";
+"Anuleaza ultima actiune (Cmd+Z)" = "Anuleaza ultima actiune (Cmd+Z)";
+"Refa ultima actiune anulata (Cmd+Shift+Z)" = "Refa ultima actiune anulata (Cmd+Shift+Z)";
+"Anuleaza" = "Anuleaza";
+"Refa" = "Refa";
+"Editari" = "Editari";
+"Lista editari aplicate" = "Lista editari aplicate";
+
+"Deschide imagine..." = "Deschide imagine...";
+"Deschide recente" = "Deschide recente";
+"Niciun fisier recent" = "Niciun fisier recent";
+"Goleste lista" = "Goleste lista";
+"Inchide tab" = "Inchide tab";
+"Inchide fereastra" = "Inchide fereastra";
+"Salveaza ca..." = "Salveaza ca...";
+"Preferinte..." = "Preferinte...";
+
+"Click-drag pentru a misca imaginea in workspace. Trackpad: scroll pentru pan, pinch pentru zoom." = "Click-drag pentru a misca imaginea in workspace. Trackpad: scroll pentru pan, pinch pentru zoom.";
+
+"Histograma" = "Histograma";
+"Luminanta" = "Luminanta";
+"RGB" = "RGB";
+"R" = "R";
+"G" = "G";
+"B" = "B";
+"Luminozitate" = "Luminozitate";
+"Contrast" = "Contrast";
+"Saturatie" = "Saturatie";
+"Expunere" = "Expunere";
+"Aplica" = "Aplica";
+"Anulaza" = "Anuleaza";
+"Reseteaza" = "Reseteaza";
+"Reseteaza ajustarile" = "Reseteaza ajustarile";
+
+"-90°" = "-90°";
+"+90°" = "+90°";
+"Unghi (°)" = "Unghi (°)";
+"Orizontal" = "Orizontal";
+"Vertical" = "Vertical";
+"Stare" = "Stare";
+"Reseteaza rotire / flip" = "Reseteaza rotire / flip";
+
+"Trage colturile sau muchiile dreptunghiului. Click in interior pentru a-l muta." = "Trage colturile sau muchiile dreptunghiului. Click in interior pentru a-l muta.";
+"Raport" = "Raport";
+"Liber" = "Liber";
+"Original" = "Original";
+"Dreptunghi (pixeli)" = "Dreptunghi (pixeli)";
+"Reseteaza dreptunghiul la imaginea intreaga" = "Reseteaza dreptunghiul la imaginea intreaga";
+
+"Editari aplicate" = "Editari aplicate";
+"Reseteaza tot" = "Reseteaza tot";
+"Niciuna" = "Niciuna";
+"Revert acest pas" = "Revert acest pas";
+"Editarile sunt aplicate live; reverturile sunt undoable." = "Editarile sunt aplicate live; reverturile sunt undoable.";
+"Flip orizontal" = "Flip orizontal";
+"Flip vertical" = "Flip vertical";
+"Activ" = "Activ";
+
+"Fisier" = "Fisier";
+"Captura" = "Captura";
+"Photo2Mac (XMP)" = "Photo2Mac (XMP)";
+"Nume" = "Nume";
+"Format" = "Format";
+"Marime" = "Marime";
+"Dimensiune" = "Dimensiune";
+"Color model" = "Color model";
+"Data" = "Data";
+"Camera" = "Camera";
+"Obiectiv" = "Obiectiv";
+"ISO" = "ISO";
+"Timp expunere" = "Timp expunere";
+"Diafragma" = "Diafragma";
+"Lungime focala" = "Lungime focala";
+"Editari incorporate in fisier" = "Editari incorporate in fisier";
+"Fisierul nu contine editari Photo2Mac" = "Fisierul nu contine editari Photo2Mac";
+"Vezi JSON brut" = "Vezi JSON brut";
+"Ascunde JSON" = "Ascunde JSON";
+"Nu am putut citi metadatele fisierului." = "Nu am putut citi metadatele fisierului.";
+
+"Selecteaza un fisier de pe disc" = "Selecteaza un fisier de pe disc";
+"Sau trage o imagine oriunde in fereastra" = "Sau trage o imagine oriunde in fereastra";
+"Fisiere recente" = "Fisiere recente";
+
+"Workspace gol" = "Workspace gol";
+"Trage o imagine aici, sau Cmd+O." = "Trage o imagine aici, sau Cmd+O.";
+
+"Vizualizare" = "Vizualizare";
+"Zoom initial la deschidere" = "Zoom initial la deschidere";
+"Re-aplica modul la redimensionarea ferestrei" = "Re-aplica modul la redimensionarea ferestrei";
+"Cand e bifat, la fiecare redimensionare imaginea revine la modul de vizualizare ales, chiar daca ai pannat/zoomat manual." = "Cand e bifat, la fiecare redimensionare imaginea revine la modul de vizualizare ales, chiar daca ai pannat/zoomat manual.";
+"Incadrare in fereastra" = "Incadrare in fereastra";
+"Marime reala (100%)" = "Marime reala (100%)";
+"Umple fereastra" = "Umple fereastra";
+"Numar maxim: %d" = "Numar maxim: %d";
+"Istoric (undo / redo)" = "Istoric (undo / redo)";
+"Numar maxim de actiuni: %d" = "Numar maxim de actiuni: %d";
+"Slider-ele coaleseaza un drag complet intr-o singura actiune." = "Slider-ele coaleseaza un drag complet intr-o singura actiune.";
+"Limba" = "Limba";
+"Limba aplicatiei" = "Limba aplicatiei";
+"Auto / System" = "Auto / Sistem";
+"English" = "English";
+"Română" = "Română";
+
+"Continuati editarile salvate automat?" = "Continuati editarile salvate automat?";
+"Photo2Mac a gasit editari nesalvate pentru %@." = "Photo2Mac a gasit editari nesalvate pentru %@.";
+"Continui" = "Continui";
+"Renunt" = "Renunt";
+
+"Eroare la salvare" = "Eroare la salvare";
+"OK" = "OK";
+"Nu am putut randa imaginea." = "Nu am putut randa imaginea.";
+"Scrierea fisierului a esuat la %@." = "Scrierea fisierului a esuat la %@.";
+"Salveaza imaginea" = "Salveaza imaginea";
+"Nume fisier:" = "Nume fisier:";

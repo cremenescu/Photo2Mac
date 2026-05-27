@@ -67,7 +67,7 @@ struct PreferencesCommand: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .appSettings) {
-            Button("Preferinte...") {
+            Button(t("Preferinte...")) {
                 openWindow(id: "preferences")
             }
             .keyboardShortcut(",", modifiers: [.command])
@@ -78,11 +78,11 @@ struct PreferencesCommand: Commands {
 struct UndoRedoCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .undoRedo) {
-            Button("Anuleaza") {
+            Button(t("Anuleaza")) {
                 WorkspaceHolder.shared.workspace.selected?.performUndo()
             }
             .keyboardShortcut("z", modifiers: [.command])
-            Button("Refa") {
+            Button(t("Refa")) {
                 WorkspaceHolder.shared.workspace.selected?.performRedo()
             }
             .keyboardShortcut("z", modifiers: [.command, .shift])
@@ -98,15 +98,19 @@ struct Photo2MacApp: App {
         NSWindow.allowsAutomaticWindowTabbing = false
     }
 
+    @StateObject private var languageManager = LanguageManager.shared
+
     var body: some Scene {
         Window("Photo2Mac", id: "main") {
             WorkspaceView()
                 .environmentObject(WorkspaceHolder.shared.workspace)
+                .environmentObject(languageManager)
                 .frame(minWidth: 500, minHeight: 380)
+                .id(languageManager.choice)
         }
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Deschide imagine...") {
+                Button(t("Deschide imagine...")) {
                     WorkspaceHolder.shared.workspace.openPanel()
                 }
                 .keyboardShortcut("o", modifiers: [.command])
@@ -115,18 +119,18 @@ struct Photo2MacApp: App {
             }
             CommandGroup(after: .newItem) {
                 Divider()
-                Button("Inchide tab") {
+                Button(t("Inchide tab")) {
                     WorkspaceHolder.shared.workspace.closeSelected()
                 }
                 .keyboardShortcut("w", modifiers: [.command])
 
-                Button("Inchide fereastra") {
+                Button(t("Inchide fereastra")) {
                     NSApp.keyWindow?.close()
                 }
                 .keyboardShortcut("w", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .saveItem) {
-                Button("Salveaza ca...") {
+                Button(t("Salveaza ca...")) {
                     if let doc = WorkspaceHolder.shared.workspace.selected {
                         _ = SaveService.saveAs(doc: doc)
                     }
@@ -137,8 +141,10 @@ struct Photo2MacApp: App {
             UndoRedoCommands()
         }
 
-        Window("Preferinte", id: "preferences") {
+        Window("Photo2Mac Settings", id: "preferences") {
             SettingsView()
+                .environmentObject(languageManager)
+                .id(languageManager.choice)
         }
         .defaultSize(width: 640, height: 540)
         .defaultPosition(.center)

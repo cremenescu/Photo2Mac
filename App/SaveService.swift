@@ -11,8 +11,8 @@ enum SaveService {
     @discardableResult
     static func saveAs(doc: OpenImage) -> URL? {
         let panel = NSSavePanel()
-        panel.title = "Salveaza imaginea"
-        panel.nameFieldLabel = "Nume fisier:"
+        panel.title = t("Salveaza imaginea")
+        panel.nameFieldLabel = t("Nume fisier:")
         // Default name: <original>-edited.<ext>, JPEG by default.
         let baseName = doc.url.deletingPathExtension().lastPathComponent
         panel.nameFieldStringValue = baseName + "-edited.jpg"

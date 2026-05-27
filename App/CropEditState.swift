@@ -14,8 +14,8 @@ enum CropAspect: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .free: return "Liber"
-        case .original: return "Original"
+        case .free: return t("Liber")
+        case .original: return t("Original")
         case .square: return "1:1"
         case .fourThree: return "4:3"
         case .threeFour: return "3:4"

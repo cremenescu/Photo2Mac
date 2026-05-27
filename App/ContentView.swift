@@ -10,15 +10,15 @@ enum EditorTool: String, CaseIterable, Identifiable {
     var iconName: String { rawValue }
     var label: String {
         switch self {
-        case .hand: return "Mutare"
-        case .crop: return "Decupare"
-        case .rotate: return "Rotire"
-        case .tune: return "Ajustari"
-        case .text: return "Text"
-        case .arrow: return "Sageata"
-        case .rect: return "Dreptunghi"
-        case .blur: return "Blur"
-        case .info: return "Metadate"
+        case .hand: return t("Mutare")
+        case .crop: return t(t("Decupare"))
+        case .rotate: return t(t("Rotire"))
+        case .tune: return t("Ajustari")
+        case .text: return t("Text")
+        case .arrow: return t("Sageata")
+        case .rect: return t("Dreptunghi")
+        case .blur: return t("Blur")
+        case .info: return t("Metadate")
         }
     }
 }
@@ -116,7 +116,7 @@ struct WorkspaceView: View {
                 Button {
                     zoom = max(0.05, zoom / 1.25)
                 } label: { IconifyImage(name: "zoom-out", size: 16) }
-                .help("Micsoreaza")
+                .help(t("Micsoreaza"))
                 .disabled(workspace.selected == nil)
 
                 Text(verbatim: String(format: "%d%%", Int((zoom * 100).rounded())))
@@ -129,7 +129,7 @@ struct WorkspaceView: View {
                 Button {
                     zoom = min(16, zoom * 1.25)
                 } label: { IconifyImage(name: "zoom-in", size: 16) }
-                .help("Mareste")
+                .help(t("Mareste"))
                 .disabled(workspace.selected == nil)
 
                 Menu {
@@ -149,13 +149,13 @@ struct WorkspaceView: View {
                     Image(systemName: "viewfinder")
                         .font(.system(size: 15, weight: .regular))
                 }
-                .help("Mod vizualizare")
+                .help(t("Mod vizualizare"))
                 .disabled(workspace.selected == nil)
 
                 Toggle(isOn: $showInspector) {
                     IconifyImage(name: "inspector", size: 16)
                 }
-                .help("Inspector")
+                .help(t("Inspector"))
             }
         }
     }
@@ -173,7 +173,7 @@ struct EditsListButton: View {
             EditsListButtonActive(doc: doc)
         } else {
             Button {} label: { IconifyImage(name: "edits", size: 18) }
-                .help("Editari")
+                .help(t("Editari"))
                 .disabled(true)
         }
     }
@@ -189,7 +189,7 @@ private struct EditsListButtonActive: View {
         } label: {
             IconifyImage(name: "edits", size: 18)
         }
-        .help("Lista editari aplicate")
+        .help(t("Lista editari aplicate"))
         .disabled(doc.stack.isNeutral)
         .popover(isPresented: $presented, arrowEdge: .top) {
             EditsListView(doc: doc)
@@ -209,7 +209,7 @@ struct UndoRedoButtons: View {
         } else {
             Group {
                 Button {} label: { IconifyImage(name: "undo", size: 18) }
-                    .help("Anuleaza")
+                    .help(t("Anuleaza"))
                     .disabled(true)
                 Button {} label: { IconifyImage(name: "redo", size: 18) }
                     .help("Refa")
@@ -229,7 +229,7 @@ private struct UndoRedoButtonsActive: View {
         } label: {
             IconifyImage(name: "undo", size: 18)
         }
-        .help("Anuleaza ultima actiune (Cmd+Z)")
+        .help(t("Anuleaza ultima actiune (Cmd+Z)"))
         .disabled(!history.canUndo)
 
         Button {
@@ -237,7 +237,7 @@ private struct UndoRedoButtonsActive: View {
         } label: {
             IconifyImage(name: "redo", size: 18)
         }
-        .help("Refa ultima actiune anulata (Cmd+Shift+Z)")
+        .help(t("Refa ultima actiune anulata (Cmd+Shift+Z)"))
         .disabled(!history.canRedo)
     }
 }
@@ -358,8 +358,8 @@ struct EmptyWorkspaceView: View {
 
                 VStack(spacing: 12) {
                     actionRow(icon: "folder.fill",
-                              title: "Deschide imagine...",
-                              subtitle: "Selecteaza un fisier de pe disc",
+                              title: t(t("Deschide imagine...")),
+                              subtitle: t("Selecteaza un fisier de pe disc"),
                               tint: .blue) {
                         workspace.openPanel()
                     }
@@ -368,7 +368,7 @@ struct EmptyWorkspaceView: View {
 
                 Spacer()
 
-                Text("Sau trage o imagine oriunde in fereastra")
+                Text(t("Sau trage o imagine oriunde in fereastra"))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .padding(.bottom, 12)
@@ -381,7 +381,7 @@ struct EmptyWorkspaceView: View {
 
             // Right: recents
             VStack(alignment: .leading, spacing: 0) {
-                Text("Fisiere recente")
+                Text(t("Fisiere recente"))
                     .font(.headline)
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
@@ -389,7 +389,7 @@ struct EmptyWorkspaceView: View {
 
                 if recents.urls.isEmpty {
                     VStack {
-                        Text("Niciun fisier recent")
+                        Text(t("Niciun fisier recent"))
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -525,7 +525,7 @@ struct InspectorView: View {
             Group {
                 switch tool {
                 case .hand:
-                    Text("Click-drag pentru a misca imaginea in workspace. Trackpad: scroll pentru pan, pinch pentru zoom.")
+                    Text(t("Click-drag pentru a misca imaginea in workspace. Trackpad: scroll pentru pan, pinch pentru zoom."))
                         .foregroundStyle(.secondary)
                         .font(.callout)
                 case .tune:
@@ -572,14 +572,14 @@ struct InspectorView: View {
             if let doc = workspace.selected {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Fisier")
+                    Text(t("Fisier"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(doc.displayName)
                         .font(.callout)
                         .lineLimit(2)
                         .truncationMode(.middle)
-                    Text("Dimensiune")
+                    Text(t("Dimensiune"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 4)
@@ -602,14 +602,14 @@ struct MetadataInspector: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if let meta = ImageMetadata.read(from: doc.url) {
-                    section("Fisier") {
-                        row("Nume", doc.url.lastPathComponent, lineLimit: 2)
-                        if let f = meta.formattedFormat { row("Format", f) }
-                        if let s = meta.formattedFileSize { row("Marime", s) }
+                    section(t("Fisier")) {
+                        row(t("Nume"), doc.url.lastPathComponent, lineLimit: 2)
+                        if let f = meta.formattedFormat { row(t("Format"), f) }
+                        if let s = meta.formattedFileSize { row(t("Marime"), s) }
                         if let w = meta.pixelWidth, let h = meta.pixelHeight {
-                            row("Dimensiune", "\(w) × \(h) px")
+                            row(t("Dimensiune"), "\(w) × \(h) px")
                         }
-                        if let cm = meta.colorModel { row("Color model", cm) }
+                        if let cm = meta.colorModel { row(t("Color model"), cm) }
                     }
 
                     let hasEXIF = meta.cameraMake != nil || meta.cameraModel != nil ||
@@ -617,38 +617,38 @@ struct MetadataInspector: View {
                                   meta.exposureTime != nil || meta.fNumber != nil ||
                                   meta.focalLengthMM != nil || meta.dateTakenISO != nil
                     if hasEXIF {
-                        section("Captura") {
-                            if let date = meta.dateTakenISO { row("Data", date) }
+                        section(t("Captura")) {
+                            if let date = meta.dateTakenISO { row(t("Data"), date) }
                             if let m = meta.cameraMake, let mo = meta.cameraModel {
-                                row("Camera", "\(m) \(mo)")
-                            } else if let m = meta.cameraMake { row("Camera", m) }
-                              else if let mo = meta.cameraModel { row("Camera", mo) }
-                            if let lens = meta.lens { row("Obiectiv", lens, lineLimit: 2) }
-                            if let iso = meta.iso { row("ISO", "\(iso)") }
-                            if let s = meta.exposureTime { row("Timp expunere", s) }
-                            if let f = meta.fNumber { row("Diafragma", String(format: "f/%.1f", f)) }
+                                row(t("Camera"), "\(m) \(mo)")
+                            } else if let m = meta.cameraMake { row(t("Camera"), m) }
+                              else if let mo = meta.cameraModel { row(t("Camera"), mo) }
+                            if let lens = meta.lens { row(t("Obiectiv"), lens, lineLimit: 2) }
+                            if let iso = meta.iso { row(t("ISO"), "\(iso)") }
+                            if let s = meta.exposureTime { row(t("Timp expunere"), s) }
+                            if let f = meta.fNumber { row(t("Diafragma"), String(format: "f/%.1f", f)) }
                             if let fl = meta.focalLengthMM {
-                                row("Lungime focala", String(format: "%.0f mm", fl))
+                                row(t("Lungime focala"), String(format: "%.0f mm", fl))
                             }
                         }
                     }
 
-                    section("Photo2Mac (XMP)") {
+                    section(t("Photo2Mac (XMP)")) {
                         HStack(spacing: 6) {
                             Image(systemName: meta.hasPhoto2MacStack
                                   ? "checkmark.circle.fill"
                                   : "circle.dashed")
                                 .foregroundStyle(meta.hasPhoto2MacStack ? Color.green : Color.secondary)
                             Text(meta.hasPhoto2MacStack
-                                 ? "Editari incorporate in fisier"
-                                 : "Fisierul nu contine editari Photo2Mac")
+                                 ? t("Editari incorporate in fisier")
+                                 : t("Fisierul nu contine editari Photo2Mac"))
                                 .font(.callout)
                         }
                         if meta.hasPhoto2MacStack {
                             Button {
                                 showingRawJSON.toggle()
                             } label: {
-                                Text(showingRawJSON ? "Ascunde JSON" : "Vezi JSON brut")
+                                Text(showingRawJSON ? t("Ascunde JSON") : t("Vezi JSON brut"))
                                     .frame(maxWidth: .infinity)
                             }
                             if showingRawJSON, let json = meta.photo2MacStackJSON {
@@ -665,7 +665,7 @@ struct MetadataInspector: View {
                         }
                     }
                 } else {
-                    Text("Nu am putut citi metadatele fisierului.")
+                    Text(t("Nu am putut citi metadatele fisierului."))
                         .foregroundStyle(.secondary)
                         .font(.callout)
                 }
@@ -723,7 +723,7 @@ struct AspectPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Raport")
+            Text(t("Raport"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Picker("", selection: Binding(
@@ -747,7 +747,7 @@ struct CropInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Trage colturile sau muchiile dreptunghiului. Click in interior pentru a-l muta.")
+            Text(t("Trage colturile sau muchiile dreptunghiului. Click in interior pentru a-l muta."))
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
@@ -755,7 +755,7 @@ struct CropInspector: View {
                 AspectPicker(state: state)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Dreptunghi (pixeli)")
+                    Text(t("Dreptunghi (pixeli)"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(String(format: "%d, %d  •  %d × %d",
@@ -769,11 +769,11 @@ struct CropInspector: View {
             Divider().padding(.vertical, 4)
 
             HStack {
-                Button("Anuleaza") {
+                Button(t("Anuleaza")) {
                     cancelCrop()
                 }
                 Spacer()
-                Button("Aplica") {
+                Button(t("Aplica")) {
                     applyCrop()
                 }
                 .keyboardShortcut(.return, modifiers: [])
@@ -786,10 +786,10 @@ struct CropInspector: View {
                     s.rect = CGRect(origin: .zero, size: s.imageSize)
                 }
             } label: {
-                Text("Reseteaza")
+                Text(t("Reseteaza"))
                     .frame(maxWidth: .infinity)
             }
-            .help("Reseteaza dreptunghiul la imaginea intreaga")
+            .help(t("Reseteaza dreptunghiul la imaginea intreaga"))
             .padding(.top, 4)
         }
         .onAppear {
@@ -882,7 +882,7 @@ struct RotateInspector: View {
             // Fine rotation: -180 .. +180 in 0.01° steps.
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text("Unghi (°)")
+                    Text(t("Unghi (°)"))
                         .font(.callout)
                     Spacer()
                     TextField("", value: Binding(
@@ -907,7 +907,7 @@ struct RotateInspector: View {
                 Button {
                     doc.stack.flipHorizontal.toggle()
                 } label: {
-                    Label { Text("Orizontal") } icon: {
+                    Label { Text(t("Orizontal")) } icon: {
                         IconifyImage(name: "flip-h", size: 16)
                     }
                     .labelStyle(.titleAndIcon)
@@ -919,7 +919,7 @@ struct RotateInspector: View {
                 Button {
                     doc.stack.flipVertical.toggle()
                 } label: {
-                    Label { Text("Vertical") } icon: {
+                    Label { Text(t("Vertical")) } icon: {
                         IconifyImage(name: "flip-v", size: 16)
                     }
                     .labelStyle(.titleAndIcon)
@@ -933,7 +933,7 @@ struct RotateInspector: View {
             Divider().padding(.vertical, 4)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Stare")
+                Text(t("Stare"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 6) {
@@ -956,9 +956,9 @@ struct RotateInspector: View {
             Divider().padding(.vertical, 4)
 
             HStack {
-                Button("Anuleaza") { cancel() }
+                Button(t("Anuleaza")) { cancel() }
                 Spacer()
-                Button("Aplica") { apply() }
+                Button(t("Aplica")) { apply() }
                     .keyboardShortcut(.return, modifiers: [])
                     .buttonStyle(.borderedProminent)
                     .disabled(!hasPendingChanges)
@@ -969,7 +969,7 @@ struct RotateInspector: View {
                 doc.stack.flipHorizontal = false
                 doc.stack.flipVertical = false
             } label: {
-                Text("Reseteaza rotire / flip")
+                Text(t("Reseteaza rotire / flip"))
                     .frame(maxWidth: .infinity)
             }
             .disabled(abs(doc.stack.rotateDegrees) < 0.0001
@@ -1027,7 +1027,7 @@ struct TuneInspector: View {
             // Histogram with channel-mode picker.
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("Histograma")
+                    Text(t("Histograma"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -1046,7 +1046,7 @@ struct TuneInspector: View {
             Divider().padding(.vertical, 2)
 
             AdjustmentSlider(
-                label: "Luminozitate",
+                label: t(t("Luminozitate")),
                 value: Binding(
                     get: { doc.stack.adjustments.brightness },
                     set: { doc.stack.adjustments.brightness = $0 }
@@ -1054,7 +1054,7 @@ struct TuneInspector: View {
                 range: -1...1
             )
             AdjustmentSlider(
-                label: "Contrast",
+                label: t(t("Contrast")),
                 value: Binding(
                     get: { doc.stack.adjustments.contrast },
                     set: { doc.stack.adjustments.contrast = $0 }
@@ -1062,7 +1062,7 @@ struct TuneInspector: View {
                 range: -1...1
             )
             AdjustmentSlider(
-                label: "Saturatie",
+                label: t(t("Saturatie")),
                 value: Binding(
                     get: { doc.stack.adjustments.saturation },
                     set: { doc.stack.adjustments.saturation = $0 }
@@ -1070,7 +1070,7 @@ struct TuneInspector: View {
                 range: -1...1
             )
             AdjustmentSlider(
-                label: "Expunere",
+                label: t(t("Expunere")),
                 value: Binding(
                     get: { doc.stack.adjustments.exposure },
                     set: { doc.stack.adjustments.exposure = $0 }
@@ -1082,9 +1082,9 @@ struct TuneInspector: View {
             Divider().padding(.vertical, 4)
 
             HStack {
-                Button("Anuleaza") { cancel() }
+                Button(t("Anuleaza")) { cancel() }
                 Spacer()
-                Button("Aplica") { apply() }
+                Button(t("Aplica")) { apply() }
                     .keyboardShortcut(.return, modifiers: [])
                     .buttonStyle(.borderedProminent)
                     .disabled(!hasPendingChanges)
@@ -1093,7 +1093,7 @@ struct TuneInspector: View {
             Button {
                 doc.stack.adjustments.reset()
             } label: {
-                Text("Reseteaza ajustarile")
+                Text(t("Reseteaza ajustarile"))
                     .frame(maxWidth: .infinity)
             }
             .disabled(doc.stack.adjustments.isNeutral)
@@ -1194,9 +1194,9 @@ struct RecentMenu: View {
     @ObservedObject private var recents = RecentFiles.shared
 
     var body: some View {
-        Menu("Deschide recente") {
+        Menu(t("Deschide recente")) {
             if recents.urls.isEmpty {
-                Text("Niciun fisier recent").foregroundStyle(.secondary)
+                Text(t("Niciun fisier recent")).foregroundStyle(.secondary)
             } else {
                 ForEach(recents.urls, id: \.self) { url in
                     Button(url.lastPathComponent) {
@@ -1204,7 +1204,7 @@ struct RecentMenu: View {
                     }
                 }
                 Divider()
-                Button("Goleste lista") { recents.clear() }
+                Button(t("Goleste lista")) { recents.clear() }
             }
         }
     }
@@ -1225,8 +1225,8 @@ struct SettingsView: View {
 
     private var settingsForm: some View {
         Form {
-            Section("Vizualizare") {
-                Picker("Zoom initial la deschidere", selection: Binding(
+            Section(t("Vizualizare")) {
+                Picker(t("Zoom initial la deschidere"), selection: Binding(
                     get: { settings.initialZoomMode },
                     set: { settings.initialZoomMode = $0 }
                 )) {
@@ -1234,16 +1234,16 @@ struct SettingsView: View {
                         Text(z.label).tag(z)
                     }
                 }
-                Toggle("Re-aplica modul la redimensionarea ferestrei",
+                Toggle(t("Re-aplica modul la redimensionarea ferestrei"),
                        isOn: Binding(
                             get: { settings.alwaysRefitOnResize },
                             set: { settings.alwaysRefitOnResize = $0 }
                        ))
-                Text("Cand e bifat, la fiecare redimensionare imaginea revine la modul de vizualizare ales, chiar daca ai pannat/zoomat manual.")
+                Text(t("Cand e bifat, la fiecare redimensionare imaginea revine la modul de vizualizare ales, chiar daca ai pannat/zoomat manual."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("Fisiere recente") {
+            Section(t("Fisiere recente")) {
                 Stepper(value: Binding(
                     get: { settings.maxRecentItems },
                     set: { newVal in
@@ -1251,21 +1251,31 @@ struct SettingsView: View {
                         recents.trim(to: newVal)
                     }
                 ), in: 1...50) {
-                    Text("Numar maxim: \(settings.maxRecentItems)")
+                    Text(t("Numar maxim: %d", settings.maxRecentItems))
                 }
-                Button("Goleste lista") { recents.clear() }
+                Button(t("Goleste lista")) { recents.clear() }
                     .disabled(recents.urls.isEmpty)
             }
-            Section("Istoric (undo / redo)") {
+            Section(t("Istoric (undo / redo)")) {
                 Stepper(value: Binding(
                     get: { settings.maxUndoLevels },
                     set: { settings.maxUndoLevels = $0 }
                 ), in: 1...500) {
-                    Text("Numar maxim de actiuni: \(settings.maxUndoLevels)")
+                    Text(t("Numar maxim de actiuni: %d", settings.maxUndoLevels))
                 }
-                Text("Slider-ele coaleseaza un drag complet intr-o singura actiune.")
+                Text(t("Slider-ele coaleseaza un drag complet intr-o singura actiune."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            Section(t("Limba")) {
+                Picker(t("Limba aplicatiei"), selection: Binding(
+                    get: { LanguageManager.shared.choice },
+                    set: { LanguageManager.shared.choice = $0 }
+                )) {
+                    ForEach(AppLanguage.allCases) { lang in
+                        Text(lang.nativeName).tag(lang)
+                    }
+                }
             }
         }
         .formStyle(.grouped)

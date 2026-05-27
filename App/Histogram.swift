@@ -11,7 +11,7 @@ public enum HistogramMode: String, CaseIterable, Identifiable {
     public var id: String { rawValue }
     public var label: String {
         switch self {
-        case .luminance: return "Luminanta"
+        case .luminance: return t("Luminanta")
         case .rgb: return "RGB"
         case .red: return "R"
         case .green: return "G"

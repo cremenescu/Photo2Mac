@@ -17,10 +17,10 @@ struct EditsListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Editari aplicate")
+                Text(t("Editari aplicate"))
                     .font(.headline)
                 Spacer()
-                Button("Reseteaza tot") {
+                Button(t("Reseteaza tot")) {
                     revertAll()
                 }
                 .disabled(doc.stack.isNeutral)
@@ -34,7 +34,7 @@ struct EditsListView: View {
             let entries = makeEntries()
             if entries.isEmpty {
                 VStack {
-                    Text("Niciuna")
+                    Text(t("Niciuna"))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -62,7 +62,7 @@ struct EditsListView: View {
                                         .foregroundStyle(Color.secondary)
                                 }
                                 .buttonStyle(.plain)
-                                .help("Revert acest pas")
+                                .help(t("Revert acest pas"))
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
@@ -73,7 +73,7 @@ struct EditsListView: View {
                 .frame(maxHeight: 320)
             }
 
-            Text("Editarile sunt aplicate live; reverturile sunt undoable.")
+            Text(t("Editarile sunt aplicate live; reverturile sunt undoable."))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
@@ -94,7 +94,7 @@ struct EditsListView: View {
             let hPct = Int(crop.height * 100)
             out.append(EditEntry(
                 id: "crop",
-                label: "Decupare",
+                label: t("Decupare"),
                 detail: "\(xPct)% \(yPct)%  •  \(wPct)% × \(hPct)%",
                 revert: { doc.commitChange { doc.stack.crop = nil } }
             ))
@@ -102,7 +102,7 @@ struct EditsListView: View {
         if abs(s.rotateDegrees) > 0.0001 {
             out.append(EditEntry(
                 id: "rotate",
-                label: "Rotire",
+                label: t("Rotire"),
                 detail: String(format: "%.2f°", s.rotateDegrees),
                 revert: { doc.commitChange { doc.stack.rotateDegrees = 0 } }
             ))
@@ -110,23 +110,23 @@ struct EditsListView: View {
         if s.flipHorizontal {
             out.append(EditEntry(
                 id: "flipH",
-                label: "Flip orizontal",
-                detail: "Activ",
+                label: t("Flip orizontal"),
+                detail: t("Activ"),
                 revert: { doc.commitChange { doc.stack.flipHorizontal = false } }
             ))
         }
         if s.flipVertical {
             out.append(EditEntry(
                 id: "flipV",
-                label: "Flip vertical",
-                detail: "Activ",
+                label: t("Flip vertical"),
+                detail: t("Activ"),
                 revert: { doc.commitChange { doc.stack.flipVertical = false } }
             ))
         }
         if s.adjustments.brightness != 0 {
             out.append(EditEntry(
                 id: "brightness",
-                label: "Luminozitate",
+                label: t("Luminozitate"),
                 detail: signed(s.adjustments.brightness * 100),
                 revert: { doc.commitChange { doc.stack.adjustments.brightness = 0 } }
             ))
@@ -134,7 +134,7 @@ struct EditsListView: View {
         if s.adjustments.contrast != 0 {
             out.append(EditEntry(
                 id: "contrast",
-                label: "Contrast",
+                label: t("Contrast"),
                 detail: signed(s.adjustments.contrast * 100),
                 revert: { doc.commitChange { doc.stack.adjustments.contrast = 0 } }
             ))
@@ -142,7 +142,7 @@ struct EditsListView: View {
         if s.adjustments.saturation != 0 {
             out.append(EditEntry(
                 id: "saturation",
-                label: "Saturatie",
+                label: t("Saturatie"),
                 detail: signed(s.adjustments.saturation * 100),
                 revert: { doc.commitChange { doc.stack.adjustments.saturation = 0 } }
             ))
@@ -150,7 +150,7 @@ struct EditsListView: View {
         if s.adjustments.exposure != 0 {
             out.append(EditEntry(
                 id: "exposure",
-                label: "Expunere",
+                label: t("Expunere"),
                 detail: String(format: "%+.2f EV", s.adjustments.exposure),
                 revert: { doc.commitChange { doc.stack.adjustments.exposure = 0 } }
             ))

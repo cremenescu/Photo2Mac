@@ -1,0 +1,152 @@
+/* Photo2Mac — English localization.
+   Format: "key" = "translation"; — keep the original Romanian as the key for
+   readability. Contributors: copy this file to <code>.lproj/Localizable.strings,
+   translate the right-hand side. Keep %d, %@, %.2f placeholders intact. */
+
+// MARK: - App
+"Photo2Mac" = "Photo2Mac";
+"Photo2Mac Settings" = "Photo2Mac Settings";
+
+// MARK: - Tools (toolbar tooltips / inspector titles)
+"Mutare" = "Move";
+"Decupare" = "Crop";
+"Rotire" = "Rotate";
+"Ajustari" = "Adjustments";
+"Text" = "Text";
+"Sageata" = "Arrow";
+"Dreptunghi" = "Rectangle";
+"Blur" = "Blur";
+"Metadate" = "Metadata";
+
+// MARK: - Toolbar buttons
+"Micsoreaza" = "Zoom out";
+"Mareste" = "Zoom in";
+"Marime reala (100%%)" = "Actual size (100%%)";
+"Mod vizualizare" = "View mode";
+"Inspector" = "Inspector";
+"Anuleaza ultima actiune (Cmd+Z)" = "Undo last action (Cmd+Z)";
+"Refa ultima actiune anulata (Cmd+Shift+Z)" = "Redo (Cmd+Shift+Z)";
+"Anuleaza" = "Undo";
+"Refa" = "Redo";
+"Editari" = "Edits";
+"Lista editari aplicate" = "Applied edits";
+
+// MARK: - Menus
+"Deschide imagine..." = "Open image…";
+"Deschide recente" = "Open Recent";
+"Niciun fisier recent" = "No recent files";
+"Goleste lista" = "Clear list";
+"Inchide tab" = "Close tab";
+"Inchide fereastra" = "Close window";
+"Salveaza ca..." = "Save As…";
+"Preferinte..." = "Preferences…";
+
+// MARK: - Hand inspector
+"Click-drag pentru a misca imaginea in workspace. Trackpad: scroll pentru pan, pinch pentru zoom." = "Click-drag to move the image around the workspace. Trackpad: scroll to pan, pinch to zoom.";
+
+// MARK: - Tune inspector
+"Histograma" = "Histogram";
+"Luminanta" = "Luminance";
+"RGB" = "RGB";
+"R" = "R";
+"G" = "G";
+"B" = "B";
+"Luminozitate" = "Brightness";
+"Contrast" = "Contrast";
+"Saturatie" = "Saturation";
+"Expunere" = "Exposure";
+"Aplica" = "Apply";
+"Anulaza" = "Cancel";
+"Reseteaza" = "Reset";
+"Reseteaza ajustarile" = "Reset adjustments";
+
+// MARK: - Rotate inspector
+"-90°" = "-90°";
+"+90°" = "+90°";
+"Unghi (°)" = "Angle (°)";
+"Orizontal" = "Horizontal";
+"Vertical" = "Vertical";
+"Stare" = "State";
+"Reseteaza rotire / flip" = "Reset rotation / flip";
+
+// MARK: - Crop inspector
+"Trage colturile sau muchiile dreptunghiului. Click in interior pentru a-l muta." = "Drag the corners or edges of the rectangle. Click inside to move it.";
+"Raport" = "Ratio";
+"Liber" = "Free";
+"Original" = "Original";
+"Dreptunghi (pixeli)" = "Rectangle (pixels)";
+"Reseteaza dreptunghiul la imaginea intreaga" = "Reset to the full image";
+
+// MARK: - Edits list popover
+"Editari aplicate" = "Applied edits";
+"Reseteaza tot" = "Reset all";
+"Niciuna" = "None";
+"Revert acest pas" = "Revert this step";
+"Editarile sunt aplicate live; reverturile sunt undoable." = "Edits are live; reverts can be undone.";
+"Flip orizontal" = "Flip horizontal";
+"Flip vertical" = "Flip vertical";
+"Activ" = "Active";
+
+// MARK: - Metadata inspector
+"Fisier" = "File";
+"Captura" = "Capture";
+"Photo2Mac (XMP)" = "Photo2Mac (XMP)";
+"Nume" = "Name";
+"Format" = "Format";
+"Marime" = "Size";
+"Dimensiune" = "Dimensions";
+"Color model" = "Color model";
+"Data" = "Date";
+"Camera" = "Camera";
+"Obiectiv" = "Lens";
+"ISO" = "ISO";
+"Timp expunere" = "Shutter";
+"Diafragma" = "Aperture";
+"Lungime focala" = "Focal length";
+"Editari incorporate in fisier" = "Edits embedded in file";
+"Fisierul nu contine editari Photo2Mac" = "File contains no Photo2Mac edits";
+"Vezi JSON brut" = "Show raw JSON";
+"Ascunde JSON" = "Hide JSON";
+"Nu am putut citi metadatele fisierului." = "Could not read file metadata.";
+
+// MARK: - Welcome screen
+"Selecteaza un fisier de pe disc" = "Pick a file from disk";
+"Sau trage o imagine oriunde in fereastra" = "Or drop an image anywhere in the window";
+"Fisiere recente" = "Recent files";
+
+// MARK: - Empty workspace
+"Workspace gol" = "Workspace empty";
+"Trage o imagine aici, sau Cmd+O." = "Drop an image here, or press Cmd+O.";
+
+// MARK: - Settings
+"Vizualizare" = "Display";
+"Zoom initial la deschidere" = "Default zoom on open";
+"Re-aplica modul la redimensionarea ferestrei" = "Reapply view mode on window resize";
+"Cand e bifat, la fiecare redimensionare imaginea revine la modul de vizualizare ales, chiar daca ai pannat/zoomat manual." = "When checked, each window resize reapplies the chosen view mode even if you've panned/zoomed manually.";
+"Incadrare in fereastra" = "Fit window";
+"Marime reala (100%)" = "Actual size (100%)";
+"Umple fereastra" = "Fill window";
+"Fisiere recente" = "Recent files";
+"Numar maxim: %d" = "Max items: %d";
+"Istoric (undo / redo)" = "History (undo / redo)";
+"Numar maxim de actiuni: %d" = "Max actions: %d";
+"Slider-ele coaleseaza un drag complet intr-o singura actiune." = "Sliders coalesce a whole drag into a single action.";
+"Limba" = "Language";
+"Limba aplicatiei" = "App language";
+"Auto / System" = "Auto / System";
+"English" = "English";
+"Română" = "Română";
+
+// MARK: - File open
+"Continuati editarile salvate automat?" = "Continue auto-saved edits?";
+"Photo2Mac a gasit editari nesalvate pentru %@." = "Photo2Mac found unsaved edits for %@.";
+"Continui" = "Continue";
+"Renunt" = "Discard";
+
+// MARK: - Save errors
+"Eroare la salvare" = "Save failed";
+"OK" = "OK";
+"Nu am putut randa imaginea." = "Couldn't render the image.";
+"Scrierea fisierului a esuat la %@." = "Writing the file failed at %@.";
+"Salveaza imaginea" = "Save image";
+"Nume fisier:" = "File name:";

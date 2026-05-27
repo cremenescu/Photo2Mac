@@ -207,10 +207,10 @@ final class Workspace: ObservableObject {
             return
         }
         let alert = NSAlert()
-        alert.messageText = "Continuati editarile salvate automat?"
-        alert.informativeText = "Photo2Mac a gasit editari nesalvate pentru \(doc.displayName)."
-        alert.addButton(withTitle: "Continui")
-        alert.addButton(withTitle: "Renunt")
+        alert.messageText = t("Continuati editarile salvate automat?")
+        alert.informativeText = t("Photo2Mac a gasit editari nesalvate pentru %@.", doc.displayName)
+        alert.addButton(withTitle: t("Continui"))
+        alert.addButton(withTitle: t("Renunt"))
         if alert.runModal() == .alertFirstButtonReturn {
             doc.applyRestoredStack(pending)
         } else {

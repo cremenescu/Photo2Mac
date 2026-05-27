@@ -10,9 +10,9 @@ enum InitialZoom: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .fit: return "Incadrare in fereastra"
-        case .actual: return "Marime reala (100%)"
-        case .fill: return "Umple fereastra"
+        case .fit: return t("Incadrare in fereastra")
+        case .actual: return t("Marime reala (100%)")
+        case .fill: return t("Umple fereastra")
         }
     }
 }
