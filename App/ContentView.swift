@@ -5,7 +5,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum EditorTool: String, CaseIterable, Identifiable {
-    case hand, crop, rotate, tune, text, arrow, rect, blur
+    case hand, crop, rotate, tune, text, arrow, rect, blur, info
     var id: String { rawValue }
     var iconName: String { rawValue }
     var label: String {
@@ -18,6 +18,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .arrow: return "Sageata"
         case .rect: return "Dreptunghi"
         case .blur: return "Blur"
+        case .info: return "Metadate"
         }
     }
 }
@@ -335,25 +336,177 @@ struct TabItemView: View {
 
 struct EmptyWorkspaceView: View {
     @EnvironmentObject var workspace: Workspace
+    @ObservedObject private var recents = RecentFiles.shared
 
     var body: some View {
-        VStack(spacing: 16) {
-            IconifyImage(name: "hand", size: 64)
-                .foregroundStyle(.secondary)
-                .opacity(0.4)
-            Text("Workspace gol")
-                .font(.title2)
-                .foregroundStyle(.secondary)
-            Text("Trage o imagine aici, sau Cmd+O.")
-                .font(.callout)
-                .foregroundStyle(.tertiary)
-            Button("Deschide imagine...") {
-                workspace.openPanel()
+        HStack(spacing: 0) {
+            // Left: branding + actions
+            VStack(spacing: 14) {
+                Image(nsImage: appIcon())
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: .black.opacity(0.25), radius: 8, y: 2)
+                VStack(spacing: 2) {
+                    Text("Photo2Mac")
+                        .font(.system(size: 22, weight: .semibold))
+                    Text(appVersion())
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(spacing: 12) {
+                    actionRow(icon: "folder.fill",
+                              title: "Deschide imagine...",
+                              subtitle: "Selecteaza un fisier de pe disc",
+                              tint: .blue) {
+                        workspace.openPanel()
+                    }
+                }
+                .padding(.top, 6)
+
+                Spacer()
+
+                Text("Sau trage o imagine oriunde in fereastra")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.bottom, 12)
             }
-            .controlSize(.large)
-            .padding(.top, 8)
+            .frame(maxWidth: 320)
+            .padding(28)
+            .background(Color(NSColor.windowBackgroundColor))
+
+            Divider()
+
+            // Right: recents
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Fisiere recente")
+                    .font(.headline)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 10)
+
+                if recents.urls.isEmpty {
+                    VStack {
+                        Text("Niciun fisier recent")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(recents.urls, id: \.self) { url in
+                                RecentRow(url: url) {
+                                    workspace.open(url: url)
+                                }
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(NSColor.controlBackgroundColor))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func actionRow(icon: String, title: String, subtitle: String,
+                            tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 22))
+                    .foregroundStyle(tint)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 14, weight: .semibold))
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.08))
+        )
+    }
+
+    private func appIcon() -> NSImage {
+        NSApp.applicationIconImage ?? NSImage()
+    }
+
+    private func appVersion() -> String {
+        let info = Bundle.main.infoDictionary
+        let v = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let b = info?["CFBundleVersion"] as? String ?? "?"
+        return "v\(v) (\(b))"
+    }
+}
+
+struct RecentRow: View {
+    let url: URL
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                if let thumb = makeThumb() {
+                    Image(nsImage: thumb)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 42, height: 42)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                } else {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 42, height: 42)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .foregroundStyle(.secondary)
+                        )
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(url.lastPathComponent)
+                        .font(.callout)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(url.deletingLastPathComponent().path)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .background(hovering ? Color.gray.opacity(0.12) : Color.clear)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+    }
+
+    /// Tiny thumbnail from the file (no full load).
+    private func makeThumb() -> NSImage? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 84,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, options as CFDictionary) else {
+            return nil
+        }
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
     }
 }
 
@@ -399,6 +552,14 @@ struct InspectorView: View {
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     }
+                case .info:
+                    if let doc = workspace.selected {
+                        MetadataInspector(doc: doc)
+                    } else {
+                        Text("Deschide o imagine pentru a vedea metadatele.")
+                            .foregroundStyle(.secondary)
+                            .font(.callout)
+                    }
                 default:
                     Text("Parametri \(tool.label) — in dezvoltare")
                         .foregroundStyle(.secondary)
@@ -430,6 +591,123 @@ struct InspectorView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+struct MetadataInspector: View {
+    @ObservedObject var doc: OpenImage
+    @State private var showingRawJSON = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if let meta = ImageMetadata.read(from: doc.url) {
+                    section("Fisier") {
+                        row("Nume", doc.url.lastPathComponent, lineLimit: 2)
+                        if let f = meta.formattedFormat { row("Format", f) }
+                        if let s = meta.formattedFileSize { row("Marime", s) }
+                        if let w = meta.pixelWidth, let h = meta.pixelHeight {
+                            row("Dimensiune", "\(w) × \(h) px")
+                        }
+                        if let cm = meta.colorModel { row("Color model", cm) }
+                    }
+
+                    let hasEXIF = meta.cameraMake != nil || meta.cameraModel != nil ||
+                                  meta.lens != nil || meta.iso != nil ||
+                                  meta.exposureTime != nil || meta.fNumber != nil ||
+                                  meta.focalLengthMM != nil || meta.dateTakenISO != nil
+                    if hasEXIF {
+                        section("Captura") {
+                            if let date = meta.dateTakenISO { row("Data", date) }
+                            if let m = meta.cameraMake, let mo = meta.cameraModel {
+                                row("Camera", "\(m) \(mo)")
+                            } else if let m = meta.cameraMake { row("Camera", m) }
+                              else if let mo = meta.cameraModel { row("Camera", mo) }
+                            if let lens = meta.lens { row("Obiectiv", lens, lineLimit: 2) }
+                            if let iso = meta.iso { row("ISO", "\(iso)") }
+                            if let s = meta.exposureTime { row("Timp expunere", s) }
+                            if let f = meta.fNumber { row("Diafragma", String(format: "f/%.1f", f)) }
+                            if let fl = meta.focalLengthMM {
+                                row("Lungime focala", String(format: "%.0f mm", fl))
+                            }
+                        }
+                    }
+
+                    section("Photo2Mac (XMP)") {
+                        HStack(spacing: 6) {
+                            Image(systemName: meta.hasPhoto2MacStack
+                                  ? "checkmark.circle.fill"
+                                  : "circle.dashed")
+                                .foregroundStyle(meta.hasPhoto2MacStack ? Color.green : Color.secondary)
+                            Text(meta.hasPhoto2MacStack
+                                 ? "Editari incorporate in fisier"
+                                 : "Fisierul nu contine editari Photo2Mac")
+                                .font(.callout)
+                        }
+                        if meta.hasPhoto2MacStack {
+                            Button {
+                                showingRawJSON.toggle()
+                            } label: {
+                                Text(showingRawJSON ? "Ascunde JSON" : "Vezi JSON brut")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            if showingRawJSON, let json = meta.photo2MacStackJSON {
+                                let pretty = prettyPrint(json) ?? json
+                                Text(pretty)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(8)
+                                    .background(Color(white: 0, opacity: 0.06))
+                                    .cornerRadius(4)
+                            }
+                        }
+                    }
+                } else {
+                    Text("Nu am putut citi metadatele fisierului.")
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func section<Content: View>(_ title: String,
+                                          @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            content()
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ label: String, _ value: String, lineLimit: Int = 1) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 80, alignment: .leading)
+            Text(value)
+                .font(.callout)
+                .lineLimit(lineLimit)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func prettyPrint(_ json: String) -> String? {
+        guard let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data),
+              let out = try? JSONSerialization.data(
+                  withJSONObject: obj,
+                  options: [.prettyPrinted, .sortedKeys]) else { return nil }
+        return String(data: out, encoding: .utf8)
     }
 }
 
