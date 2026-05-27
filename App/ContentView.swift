@@ -62,7 +62,7 @@ struct WorkspaceView: View {
                 .layoutPriority(1)
 
                 if showInspector {
-                    InspectorView(tool: tool, cropHolder: cropEdit)
+                    InspectorView(tool: $tool, cropHolder: cropEdit)
                         .frame(minWidth: 200, idealWidth: 260, maxWidth: 360)
                 }
             }
@@ -272,7 +272,7 @@ struct EmptyWorkspaceView: View {
 
 struct InspectorView: View {
     @EnvironmentObject var workspace: Workspace
-    let tool: EditorTool
+    @Binding var tool: EditorTool
     let cropHolder: CropEditHolder
 
     var body: some View {
@@ -306,7 +306,7 @@ struct InspectorView: View {
                     }
                 case .crop:
                     if let doc = workspace.selected {
-                        CropInspector(doc: doc, holder: cropHolder)
+                        CropInspector(doc: doc, holder: cropHolder, tool: $tool)
                     } else {
                         Text("Deschide o imagine pentru decupare.")
                             .foregroundStyle(.secondary)
@@ -378,6 +378,7 @@ struct AspectPicker: View {
 struct CropInspector: View {
     @ObservedObject var doc: OpenImage
     @ObservedObject var holder: CropEditHolder
+    @Binding var tool: EditorTool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -452,6 +453,7 @@ struct CropInspector: View {
             doc.stack.crop = n
         }
         holder.state = nil
+        tool = .hand
     }
 
     private func cancelCrop() {
@@ -460,6 +462,7 @@ struct CropInspector: View {
             doc.stack.crop = s.originalStackCrop
         }
         holder.state = nil
+        tool = .hand
     }
 }
 

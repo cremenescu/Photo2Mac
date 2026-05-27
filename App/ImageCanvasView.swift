@@ -3,6 +3,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 enum InitialZoom: String, CaseIterable, Identifiable, Codable {
     case fit, actual, fill
@@ -22,12 +23,24 @@ final class CanvasNSView: NSView {
         didSet { window?.invalidateCursorRects(for: self) }
     }
     /// When non-nil, draw a crop overlay and forward drags to the crop edit state.
-    var cropEditState: CropEditState? { didSet { needsDisplay = true } }
+    var cropEditState: CropEditState? {
+        didSet {
+            cropStateObservation?.cancel()
+            cropStateObservation = nil
+            if let s = cropEditState {
+                // Re-draw on ANY change to the crop state (rect or aspect).
+                // Without this, picking a new aspect ratio mutates `rect`
+                // via applyAspect but the canvas doesn't know to redraw.
+                cropStateObservation = s.objectWillChange.sink { [weak self] _ in
+                    DispatchQueue.main.async { self?.needsDisplay = true }
+                }
+            }
+            needsDisplay = true
+        }
+    }
+    private var cropStateObservation: AnyCancellable?
     /// Where the image (and so the crop overlay) is drawn within canvas bounds.
     private var imageDrawRect: CGRect = .zero
-    /// Source-of-truth update fence: caller signals "edit state changed,
-    /// redraw" by setting this.
-    var cropRedrawNonce: Int = 0 { didSet { needsDisplay = true } }
 
     override var isFlipped: Bool { true }
     override var isOpaque: Bool { false }

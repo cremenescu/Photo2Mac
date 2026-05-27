@@ -5,8 +5,9 @@ import Foundation
 import CoreGraphics
 
 enum CropAspect: String, CaseIterable, Identifiable {
-    case free, original, square, fourThree, threeFour, threeTwo, twoThree
-    case sixteenNine, nineSixteen
+    // Order matters: this is the order shown in the picker.
+    case original, square, fourThree, threeFour, threeTwo, twoThree
+    case sixteenNine, nineSixteen, free
 
     var id: String { rawValue }
 
@@ -45,7 +46,7 @@ enum CropAspect: String, CaseIterable, Identifiable {
 /// `rect` is in IMAGE PIXEL coordinates of the ORIGINAL (uncropped) image.
 final class CropEditState: ObservableObject {
     @Published var rect: CGRect
-    @Published var aspect: CropAspect = .free {
+    @Published var aspect: CropAspect = .original {
         didSet {
             if aspect != oldValue {
                 applyAspect()
