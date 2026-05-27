@@ -16,6 +16,7 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
         didSet {
             if stack != oldValue {
                 rerender()
+                scheduleAutosave()
             }
         }
     }
@@ -36,6 +37,25 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
     private var pendingRender: DispatchWorkItem?
     private let renderQueue = DispatchQueue(label: "ro.cremenescu.Photo2Mac.render",
                                              qos: .userInteractive)
+    private var pendingAutosave: DispatchWorkItem?
+    private let autosaveQueue = DispatchQueue(label: "ro.cremenescu.Photo2Mac.autosave",
+                                                qos: .background)
+
+    private func scheduleAutosave() {
+        pendingAutosave?.cancel()
+        let snap = stack
+        let url = self.url
+        let work = DispatchWorkItem {
+            AutosaveStore.shared.save(snap, for: url)
+        }
+        pendingAutosave = work
+        autosaveQueue.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
+    func clearAutosave() {
+        pendingAutosave?.cancel()
+        AutosaveStore.shared.clear(for: url)
+    }
 
     /// Render off the main thread; cancels in-flight on next tick.
     func rerender() {
@@ -76,6 +96,15 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
         if snapshot != stack {
             history.push(snapshot)
         }
+    }
+
+    /// Apply a stack restored from XMP / autosave. Doesn't push to history
+    /// (it's the initial state, not a user action).
+    func applyRestoredStack(_ s: EditStack) {
+        stack = s
+        // Cancel the scheduled autosave that didSet just queued — it's the
+        // same content we just restored.
+        pendingAutosave?.cancel()
     }
 
     func performUndo() {
@@ -158,7 +187,35 @@ final class Workspace: ObservableObject {
         documents.append(doc)
         selectedID = doc.id
         RecentFiles.shared.add(url)
+        restoreEdits(for: doc)
         return doc
+    }
+
+    /// Restore an EditStack from XMP (silent, file-embedded) or from autosave
+    /// (prompt: user can continue or discard).
+    private func restoreEdits(for doc: OpenImage) {
+        // 1. XMP in the file itself wins.
+        if let xmp = XMPStack.read(from: doc.url) {
+            doc.applyRestoredStack(xmp)
+            // File-embedded stack supersedes any older autosave.
+            AutosaveStore.shared.clear(for: doc.url)
+            return
+        }
+        // 2. Autosave fallback — ask.
+        guard let pending = AutosaveStore.shared.load(for: doc.url),
+              !pending.isNeutral else {
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "Continuati editarile salvate automat?"
+        alert.informativeText = "Photo2Mac a gasit editari nesalvate pentru \(doc.displayName)."
+        alert.addButton(withTitle: "Continui")
+        alert.addButton(withTitle: "Renunt")
+        if alert.runModal() == .alertFirstButtonReturn {
+            doc.applyRestoredStack(pending)
+        } else {
+            AutosaveStore.shared.clear(for: doc.url)
+        }
     }
 
     func closeSelected() {

@@ -125,6 +125,14 @@ struct Photo2MacApp: App {
                 }
                 .keyboardShortcut("w", modifiers: [.command, .shift])
             }
+            CommandGroup(replacing: .saveItem) {
+                Button("Salveaza ca...") {
+                    if let doc = WorkspaceHolder.shared.workspace.selected {
+                        _ = SaveService.saveAs(doc: doc)
+                    }
+                }
+                .keyboardShortcut("s", modifiers: [.command])
+            }
             PreferencesCommand()
             UndoRedoCommands()
         }
