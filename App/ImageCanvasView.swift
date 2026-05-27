@@ -18,9 +18,79 @@ enum InitialZoom: String, CaseIterable, Identifiable, Codable {
 
 final class CanvasNSView: NSView {
     var image: NSImage? { didSet { needsDisplay = true } }
+    var panEnabled: Bool = true {
+        didSet { window?.invalidateCursorRects(for: self) }
+    }
 
     override var isFlipped: Bool { true }
     override var isOpaque: Bool { false }
+    override var acceptsFirstResponder: Bool { true }
+
+    private var trackingArea: NSTrackingArea?
+    private var lastDragWindowPoint: NSPoint?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let ta = trackingArea { removeTrackingArea(ta) }
+        let ta = NSTrackingArea(
+            rect: .zero,
+            options: [.activeInKeyWindow, .mouseEnteredAndExited,
+                      .cursorUpdate, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(ta)
+        trackingArea = ta
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        if panEnabled {
+            NSCursor.openHand.set()
+        } else {
+            NSCursor.arrow.set()
+        }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        if panEnabled { NSCursor.openHand.set() }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        NSCursor.arrow.set()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard panEnabled else { return }
+        NSCursor.closedHand.set()
+        lastDragWindowPoint = event.locationInWindow
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard panEnabled,
+              let last = lastDragWindowPoint,
+              let scroll = enclosingScrollView else { return }
+        let current = event.locationInWindow
+        let dx = current.x - last.x
+        let dy = current.y - last.y
+        let mag = scroll.magnification == 0 ? 1 : scroll.magnification
+
+        var origin = scroll.contentView.bounds.origin
+        origin.x -= dx / mag
+        // Flipped view: dragging up should move content up (origin y increases)
+        origin.y -= dy / mag
+        scroll.contentView.scroll(to: origin)
+        scroll.reflectScrolledClipView(scroll.contentView)
+        lastDragWindowPoint = current
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        lastDragWindowPoint = nil
+        if panEnabled, let win = window, NSPointInRect(win.mouseLocationOutsideOfEventStream, convert(bounds, to: nil)) {
+            NSCursor.openHand.set()
+        } else {
+            NSCursor.arrow.set()
+        }
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let img = image else { return }
@@ -32,7 +102,6 @@ final class CanvasNSView: NSView {
             height: imgSize.height
         )
 
-        // Subtle shadow under image (workspace feel)
         if let ctx = NSGraphicsContext.current?.cgContext {
             ctx.saveGState()
             ctx.setShadow(offset: CGSize(width: 0, height: -3),
@@ -53,12 +122,14 @@ final class CanvasNSView: NSView {
 }
 
 struct ImageCanvasView: NSViewRepresentable {
-    let image: NSImage?
+    let image: NSImage
     @Binding var zoom: CGFloat
     let initialZoomMode: InitialZoom
+    let tool: EditorTool
+    let documentID: UUID
 
     final class Coordinator {
-        var didInitialFit = false
+        var fittedDocumentID: UUID?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -77,16 +148,11 @@ struct ImageCanvasView: NSViewRepresentable {
 
         let canvas = CanvasNSView()
         canvas.image = image
+        canvas.panEnabled = (tool == .hand)
         canvas.frame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
         scroll.documentView = canvas
 
-        NotificationCenter.default.addObserver(
-            forName: NSView.boundsDidChangeNotification,
-            object: scroll.contentView,
-            queue: .main
-        ) { _ in
-            zoom = scroll.magnification
-        }
+        scroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(
             forName: NSScrollView.didEndLiveMagnifyNotification,
             object: scroll,
@@ -94,63 +160,78 @@ struct ImageCanvasView: NSViewRepresentable {
         ) { _ in
             zoom = scroll.magnification
         }
-        scroll.contentView.postsBoundsChangedNotifications = true
 
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let canvas = scroll.documentView as? CanvasNSView else { return }
+
+        canvas.panEnabled = (tool == .hand)
+
         if canvas.image !== image {
             canvas.image = image
             canvas.frame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
-            context.coordinator.didInitialFit = false
+            context.coordinator.fittedDocumentID = nil
         }
 
-        if !context.coordinator.didInitialFit, let img = image {
-            context.coordinator.didInitialFit = true
-            DispatchQueue.main.async {
-                applyInitialZoomAndCenter(scroll: scroll, image: img)
-            }
+        if context.coordinator.fittedDocumentID != documentID {
+            // Defer until viewport has real size.
+            scheduleInitialFit(scroll: scroll, coordinator: context.coordinator)
         } else if abs(scroll.magnification - zoom) > 0.001 {
             scroll.magnification = zoom
         }
     }
 
-    private func canvasFrame(for image: NSImage?, in viewport: CGSize) -> NSRect {
-        let imgSize = image?.size ?? .zero
-        // Large canvas so user can pan image anywhere in workspace
-        let pad = max(viewport.width, viewport.height, max(imgSize.width, imgSize.height)) * 1.5
-        let w = imgSize.width + pad * 2
-        let h = imgSize.height + pad * 2
-        return NSRect(x: 0, y: 0, width: max(w, 800), height: max(h, 600))
+    private func scheduleInitialFit(scroll: NSScrollView, coordinator: Coordinator) {
+        DispatchQueue.main.async {
+            let viewport = scroll.contentView.bounds.size
+            if viewport.width < 2 || viewport.height < 2 {
+                // Layout not ready yet — retry on next runloop turn.
+                scheduleInitialFit(scroll: scroll, coordinator: coordinator)
+                return
+            }
+            applyInitialFit(scroll: scroll)
+            coordinator.fittedDocumentID = documentID
+        }
     }
 
-    private func applyInitialZoomAndCenter(scroll: NSScrollView, image: NSImage) {
+    private func canvasFrame(for image: NSImage, in viewport: CGSize) -> NSRect {
+        let imgSize = image.size
+        let pad = max(2000,
+                      max(viewport.width, viewport.height) * 2,
+                      max(imgSize.width, imgSize.height))
+        let w = imgSize.width + pad * 2
+        let h = imgSize.height + pad * 2
+        return NSRect(x: 0, y: 0, width: w, height: h)
+    }
+
+    private func applyInitialFit(scroll: NSScrollView) {
         let viewport = scroll.contentView.bounds.size
         let imgSize = image.size
         guard viewport.width > 0, viewport.height > 0,
               imgSize.width > 0, imgSize.height > 0 else { return }
 
-        let fit = min(viewport.width / imgSize.width, viewport.height / imgSize.height)
-        let fill = max(viewport.width / imgSize.width, viewport.height / imgSize.height)
+        let fitMag = min(viewport.width / imgSize.width,
+                         viewport.height / imgSize.height)
+        let fillMag = max(viewport.width / imgSize.width,
+                          viewport.height / imgSize.height)
 
         let mag: CGFloat
         switch initialZoomMode {
-        case .fit: mag = min(1.0, fit)
+        case .fit: mag = min(1.0, fitMag)
         case .actual: mag = 1.0
-        case .fill: mag = fill
+        case .fill: mag = fillMag
         }
         scroll.magnification = mag
         zoom = mag
 
-        // Center on image (image is drawn centered in canvas bounds)
         guard let canvas = scroll.documentView else { return }
         let canvasCenter = NSPoint(x: canvas.bounds.midX, y: canvas.bounds.midY)
         let visible = scroll.contentView.bounds.size
         let origin = NSPoint(
-            x: canvasCenter.x - visible.width / 2,
-            y: canvasCenter.y - visible.height / 2
+            x: canvasCenter.x - visible.width / (2 * mag),
+            y: canvasCenter.y - visible.height / (2 * mag)
         )
         scroll.contentView.scroll(to: origin)
         scroll.reflectScrolledClipView(scroll.contentView)
