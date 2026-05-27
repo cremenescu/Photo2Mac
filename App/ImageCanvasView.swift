@@ -190,6 +190,7 @@ struct ImageCanvasView: NSViewRepresentable {
 
     final class Coordinator {
         var fittedDocumentID: UUID?
+        var lastDocumentID: UUID?
         var userInteracted = false
         var lastViewportSize: CGSize = .zero
     }
@@ -247,11 +248,18 @@ struct ImageCanvasView: NSViewRepresentable {
 
         canvas.panEnabled = (tool == .hand)
 
+        let docChanged = context.coordinator.lastDocumentID != documentID
+        context.coordinator.lastDocumentID = documentID
+
         if canvas.image !== image {
             canvas.image = image
-            canvas.frame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
-            context.coordinator.fittedDocumentID = nil
-            context.coordinator.userInteracted = false
+            // Only refit frame + state if it's actually a new document.
+            // A re-render of the same document (slider tick) keeps zoom & pan.
+            if docChanged {
+                canvas.frame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
+                context.coordinator.fittedDocumentID = nil
+                context.coordinator.userInteracted = false
+            }
         }
 
         let viewportChanged = abs(context.coordinator.lastViewportSize.width - viewportSize.width) > 0.5 ||

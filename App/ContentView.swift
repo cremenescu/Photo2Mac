@@ -43,11 +43,10 @@ struct WorkspaceView: View {
                             .ignoresSafeArea()
 
                         if let doc = workspace.selected {
-                            ImageCanvasView(image: doc.displayImage,
+                            CanvasContainer(doc: doc,
                                             zoom: $zoom,
                                             initialZoomMode: settings.initialZoomMode,
                                             tool: tool,
-                                            documentID: doc.id,
                                             viewportSize: proxy.size)
                         } else {
                             EmptyWorkspaceView()
@@ -119,6 +118,25 @@ struct WorkspaceView: View {
                 .help("Inspector")
             }
         }
+    }
+}
+
+/// Observes the OpenImage so re-renders (slider live updates) propagate.
+/// WorkspaceView only observes `Workspace`, not the individual document.
+struct CanvasContainer: View {
+    @ObservedObject var doc: OpenImage
+    @Binding var zoom: CGFloat
+    let initialZoomMode: InitialZoom
+    let tool: EditorTool
+    let viewportSize: CGSize
+
+    var body: some View {
+        ImageCanvasView(image: doc.displayImage,
+                        zoom: $zoom,
+                        initialZoomMode: initialZoomMode,
+                        tool: tool,
+                        documentID: doc.id,
+                        viewportSize: viewportSize)
     }
 }
 
