@@ -8,7 +8,7 @@ import UniformTypeIdentifiers
 struct Photo2MacApp: App {
     var body: some Scene {
         DocumentGroup(newDocument: { PhotoDocument() }) { config in
-            ContentView(document: config.$document)
+            ContentView(document: config.document)
                 .frame(minWidth: 900, minHeight: 600)
         }
         .commands {

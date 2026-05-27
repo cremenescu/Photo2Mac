@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5e6c8"/>
+      <stop offset="60%" stop-color="#e6c98a"/>
+      <stop offset="100%" stop-color="#b88a4a"/>
+    </linearGradient>
+    <linearGradient id="bodyG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a2a20"/>
+      <stop offset="100%" stop-color="#1c130d"/>
+    </linearGradient>
+    <linearGradient id="topPlate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e6e6e6"/>
+      <stop offset="55%" stop-color="#b4b4b4"/>
+      <stop offset="100%" stop-color="#7a7a7a"/>
+    </linearGradient>
+    <radialGradient id="lensRing" cx="0.5" cy="0.45" r="0.6">
+      <stop offset="0%" stop-color="#dadada"/>
+      <stop offset="60%" stop-color="#888"/>
+      <stop offset="100%" stop-color="#2a2a2a"/>
+    </radialGradient>
+    <radialGradient id="lensGlass" cx="0.4" cy="0.35" r="0.7">
+      <stop offset="0%" stop-color="#3a4a5a"/>
+      <stop offset="40%" stop-color="#10161e"/>
+      <stop offset="100%" stop-color="#05080c"/>
+    </radialGradient>
+    <radialGradient id="lensHighlight" cx="0.35" cy="0.3" r="0.25">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.55)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <linearGradient id="leatherStripe" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1a1209"/>
+      <stop offset="50%" stop-color="#2c1d12"/>
+      <stop offset="100%" stop-color="#1a1209"/>
+    </linearGradient>
+    <pattern id="leather" patternUnits="userSpaceOnUse" width="14" height="14">
+      <rect width="14" height="14" fill="#241712"/>
+      <circle cx="3" cy="3" r="1" fill="#3a2418"/>
+      <circle cx="10" cy="10" r="1" fill="#3a2418"/>
+      <circle cx="10" cy="3" r="0.6" fill="#160c08"/>
+      <circle cx="3" cy="10" r="0.6" fill="#160c08"/>
+    </pattern>
+  </defs>
+
+  <!-- Squircle background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" fill="url(#bg)"/>
+
+  <!-- Soft inner shadow tone -->
+  <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" fill="none"
+        stroke="rgba(0,0,0,0.08)" stroke-width="6"/>
+
+  <!-- Camera shadow on background -->
+  <ellipse cx="512" cy="850" rx="360" ry="32" fill="rgba(0,0,0,0.28)"/>
+
+  <!-- Top plate (silver) -->
+  <rect x="170" y="220" width="684" height="120" rx="14" fill="url(#topPlate)"/>
+  <!-- Top plate edge accent -->
+  <rect x="170" y="220" width="684" height="6" rx="3" fill="rgba(255,255,255,0.5)"/>
+  <rect x="170" y="334" width="684" height="6" rx="3" fill="rgba(0,0,0,0.25)"/>
+
+  <!-- Viewfinder window (left) -->
+  <rect x="210" y="252" width="110" height="58" rx="6" fill="#0a0d12"/>
+  <rect x="220" y="262" width="90" height="38" rx="4" fill="#2d3a4a"/>
+  <rect x="222" y="264" width="86" height="10" rx="3" fill="rgba(255,255,255,0.18)"/>
+
+  <!-- Rangefinder window (center) -->
+  <circle cx="490" cy="281" r="26" fill="#0a0d12"/>
+  <circle cx="490" cy="281" r="20" fill="#1a2330"/>
+  <circle cx="484" cy="276" r="6" fill="rgba(255,255,255,0.22)"/>
+
+  <!-- Brand plate engraving -->
+  <rect x="540" y="262" width="170" height="36" rx="4" fill="rgba(255,255,255,0.12)"/>
+  <text x="625" y="288" font-family="Helvetica, Arial, sans-serif" font-size="22"
+        font-weight="700" fill="#3a3a3a" text-anchor="middle"
+        letter-spacing="2">PHOTO2MAC</text>
+
+  <!-- Shutter button (red) -->
+  <circle cx="790" cy="281" r="32" fill="#7a0e0e"/>
+  <circle cx="790" cy="281" r="26" fill="#c92020"/>
+  <circle cx="784" cy="275" r="9" fill="rgba(255,255,255,0.45)"/>
+
+  <!-- Wind lever (right side accent) -->
+  <rect x="828" y="240" width="14" height="80" rx="3" fill="#9a9a9a"/>
+
+  <!-- Main body (leather covered) -->
+  <rect x="150" y="335" width="724" height="500" rx="34" fill="url(#bodyG)"/>
+  <!-- Leather textured stripe -->
+  <rect x="158" y="380" width="708" height="410" rx="10" fill="url(#leather)"/>
+
+  <!-- Body upper accent stripe (chrome divider) -->
+  <rect x="150" y="335" width="724" height="46" rx="10" fill="url(#leatherStripe)"/>
+  <rect x="150" y="378" width="724" height="4" fill="rgba(255,255,255,0.12)"/>
+
+  <!-- Lens assembly: outer chrome ring -->
+  <circle cx="512" cy="600" r="220" fill="url(#lensRing)"/>
+  <!-- Ridged grip ring -->
+  <circle cx="512" cy="600" r="200" fill="none" stroke="#2a2a2a" stroke-width="2"/>
+  <g stroke="#3a3a3a" stroke-width="3" stroke-linecap="round">
+    <!-- Grip notches around lens -->
+    <line x1="512" y1="390" x2="512" y2="408"/>
+    <line x1="608" y1="412" x2="600" y2="428"/>
+    <line x1="688" y1="468" x2="676" y2="480"/>
+    <line x1="724" y1="540" x2="708" y2="548"/>
+    <line x1="732" y1="600" x2="714" y2="600"/>
+    <line x1="724" y1="660" x2="708" y2="652"/>
+    <line x1="688" y1="732" x2="676" y2="720"/>
+    <line x1="608" y1="788" x2="600" y2="772"/>
+    <line x1="512" y1="810" x2="512" y2="792"/>
+    <line x1="416" y1="788" x2="424" y2="772"/>
+    <line x1="336" y1="732" x2="348" y2="720"/>
+    <line x1="300" y1="660" x2="316" y2="652"/>
+    <line x1="292" y1="600" x2="310" y2="600"/>
+    <line x1="300" y1="540" x2="316" y2="548"/>
+    <line x1="336" y1="468" x2="348" y2="480"/>
+    <line x1="416" y1="412" x2="424" y2="428"/>
+  </g>
+
+  <!-- Inner lens body -->
+  <circle cx="512" cy="600" r="180" fill="#1a1a1a"/>
+  <circle cx="512" cy="600" r="180" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+
+  <!-- Glass element -->
+  <circle cx="512" cy="600" r="150" fill="url(#lensGlass)"/>
+  <circle cx="512" cy="600" r="150" fill="url(#lensHighlight)"/>
+
+  <!-- Inner reflective rings -->
+  <circle cx="512" cy="600" r="120" fill="none" stroke="rgba(120,160,200,0.18)" stroke-width="2"/>
+  <circle cx="512" cy="600" r="90" fill="none" stroke="rgba(120,160,200,0.14)" stroke-width="2"/>
+
+  <!-- Aperture star highlight -->
+  <circle cx="475" cy="565" r="22" fill="rgba(255,255,255,0.28)"/>
+  <circle cx="467" cy="557" r="9" fill="rgba(255,255,255,0.55)"/>
+
+  <!-- Small lens-flare dot -->
+  <circle cx="558" cy="650" r="6" fill="rgba(200,220,255,0.35)"/>
+</svg>

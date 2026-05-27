@@ -44,6 +44,7 @@ targets:
         LSApplicationCategoryType: public.app-category.photography
         NSHumanReadableCopyright: "Copyright (c) 2026 Razvan Cremenescu. GPL-2.0-or-later."
         NSHighResolutionCapable: true
+        CFBundleIconFile: AppIcon
         CFBundleDocumentTypes:
           - CFBundleTypeName: Image
             CFBundleTypeRole: Editor

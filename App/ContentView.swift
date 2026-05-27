@@ -4,22 +4,12 @@
 import SwiftUI
 
 enum EditorTool: String, CaseIterable, Identifiable {
-    case move, crop, rotate, text, arrow, rect, blur
+    case hand, crop, rotate, text, arrow, rect, blur
     var id: String { rawValue }
-    var systemImage: String {
-        switch self {
-        case .move: return "hand.point.up.left"
-        case .crop: return "crop"
-        case .rotate: return "rotate.right"
-        case .text: return "textformat"
-        case .arrow: return "arrow.up.right"
-        case .rect: return "rectangle"
-        case .blur: return "drop.halffull"
-        }
-    }
+    var iconName: String { rawValue }
     var label: String {
         switch self {
-        case .move: return "Mutare"
+        case .hand: return "Mutare"
         case .crop: return "Decupare"
         case .rotate: return "Rotire"
         case .text: return "Text"
@@ -31,14 +21,17 @@ enum EditorTool: String, CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
-    @Binding var document: PhotoDocument
-    @State private var tool: EditorTool = .move
+    @ObservedObject var document: PhotoDocument
+    @ObservedObject private var settings = AppSettings.shared
+    @State private var tool: EditorTool = .hand
     @State private var zoom: CGFloat = 1.0
     @State private var showInspector: Bool = true
 
     var body: some View {
         HSplitView {
-            ImageCanvasView(image: document.image, zoom: $zoom)
+            ImageCanvasView(image: document.image,
+                            zoom: $zoom,
+                            initialZoomMode: settings.initialZoomMode)
                 .frame(minWidth: 500, minHeight: 400)
                 .layoutPriority(1)
 
@@ -53,16 +46,16 @@ struct ContentView: View {
                     Button {
                         tool = t
                     } label: {
-                        Image(systemName: t.systemImage)
-                            .symbolVariant(tool == t ? .fill : .none)
+                        IconifyImage(name: t.iconName, size: 18)
+                            .foregroundStyle(tool == t ? Color.accentColor : Color.primary)
                     }
                     .help(t.label)
                 }
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
-                    zoom = max(0.1, zoom / 1.25)
-                } label: { Image(systemName: "minus.magnifyingglass") }
+                    zoom = max(0.05, zoom / 1.25)
+                } label: { IconifyImage(name: "zoom-out", size: 16) }
                 .help("Micsoreaza")
 
                 Text("\(Int(zoom * 100))%")
@@ -71,16 +64,16 @@ struct ContentView: View {
 
                 Button {
                     zoom = min(16, zoom * 1.25)
-                } label: { Image(systemName: "plus.magnifyingglass") }
+                } label: { IconifyImage(name: "zoom-in", size: 16) }
                 .help("Mareste")
 
                 Button {
                     zoom = 1.0
-                } label: { Image(systemName: "1.magnifyingglass") }
-                .help("Marime reala")
+                } label: { IconifyImage(name: "zoom-actual", size: 16) }
+                .help("Marime reala (100%)")
 
                 Toggle(isOn: $showInspector) {
-                    Image(systemName: "sidebar.trailing")
+                    IconifyImage(name: "inspector", size: 16)
                 }
                 .help("Inspector")
             }
@@ -100,8 +93,8 @@ struct InspectorView: View {
             Divider()
 
             switch tool {
-            case .move:
-                Text("Selecteaza un tool pentru a edita.")
+            case .hand:
+                Text("Tine apasat pentru a misca imaginea in workspace. Trackpad: scroll pentru pan, pinch pentru zoom.")
                     .foregroundStyle(.secondary)
                     .font(.callout)
             default:
@@ -129,13 +122,22 @@ struct InspectorView: View {
 }
 
 struct SettingsView: View {
+    @ObservedObject private var settings = AppSettings.shared
+
     var body: some View {
         Form {
-            Section("General") {
-                Text("Setari in dezvoltare.")
-                    .foregroundStyle(.secondary)
+            Section("Vizualizare") {
+                Picker("Zoom initial la deschidere", selection: Binding(
+                    get: { settings.initialZoomMode },
+                    set: { settings.initialZoomMode = $0 }
+                )) {
+                    ForEach(InitialZoom.allCases) { z in
+                        Text(z.label).tag(z)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
+        .padding()
     }
 }
