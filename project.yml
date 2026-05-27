@@ -1,0 +1,58 @@
+name: Photo2Mac
+options:
+  bundleIdPrefix: ro.cremenescu
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: YES
+    DEAD_CODE_STRIPPING: YES
+    GENERATE_INFOPLIST_FILE: NO
+
+targets:
+  Photo2Mac:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    resources:
+      - App/Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.cremenescu.Photo2Mac
+        PRODUCT_NAME: Photo2Mac
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleName: Photo2Mac
+        CFBundleDisplayName: Photo2Mac
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        CFBundleExecutable: "$(EXECUTABLE_NAME)"
+        CFBundleIdentifier: "$(PRODUCT_BUNDLE_IDENTIFIER)"
+        CFBundlePackageType: APPL
+        CFBundleDevelopmentRegion: en
+        LSMinimumSystemVersion: "14.0"
+        LSApplicationCategoryType: public.app-category.photography
+        NSHumanReadableCopyright: "Copyright (c) 2026 Razvan Cremenescu. GPL-2.0-or-later."
+        NSHighResolutionCapable: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Image
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.jpeg
+              - public.png
+              - public.heic
+              - public.heif
+              - public.tiff
+              - org.webmproject.webp
+              - public.avif
