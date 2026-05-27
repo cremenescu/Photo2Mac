@@ -18,6 +18,15 @@ enum XMPStack {
     static let propertyName = "editStack"
     static var path: CFString { "\(prefix):\(propertyName)" as CFString }
 
+    // Standard XMP namespaces used by all the well-known viewers — adding
+    // these makes Photo2Mac's edits visible to Preview, Metapho, Bridge, etc.
+    static let xmpNS = "http://ns.adobe.com/xap/1.0/"
+    static let xmpPrefix = "xmp"
+    static let tiffNS = "http://ns.adobe.com/tiff/1.0/"
+    static let tiffPrefix = "tiff"
+    static let dcNS = "http://purl.org/dc/elements/1.1/"
+    static let dcPrefix = "dc"
+
     /// Read the EditStack from XMP if present, else nil.
     static func read(from url: URL) -> EditStack? {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -53,18 +62,24 @@ enum XMPStack {
             return false
         }
         let md = CGImageMetadataCreateMutable()
+
+        // p2m: our custom edit-stack JSON (for re-edit roundtrip).
         CGImageMetadataRegisterNamespaceForPrefix(
             md, namespace as CFString, prefix as CFString, nil)
-        guard let tag = CGImageMetadataTagCreate(
+        guard let stackTag = CGImageMetadataTagCreate(
             namespace as CFString,
             prefix as CFString,
             propertyName as CFString,
             .string,
             json as CFTypeRef
         ) else { return false }
-        guard CGImageMetadataSetTagWithPath(md, nil, path, tag) else {
+        guard CGImageMetadataSetTagWithPath(md, nil, path, stackTag) else {
             return false
         }
+
+        // Standard tags that make Photo2Mac edits visible to ordinary viewers.
+        writeStandardDescription(md: md, stack: stack)
+
         guard let dest = CGImageDestinationCreateWithURL(
             url as CFURL, utiType, 1, nil
         ) else { return false }
@@ -73,6 +88,80 @@ enum XMPStack {
         ]
         CGImageDestinationAddImageAndMetadata(dest, image, md, options as CFDictionary)
         return CGImageDestinationFinalize(dest)
+    }
+
+    /// Register xmp/tiff/dc tags so generic viewers (Preview, Metapho, Bridge)
+    /// can see that the file was processed by Photo2Mac and which edits were
+    /// applied, in plain text.
+    private static func writeStandardDescription(md: CGMutableImageMetadata,
+                                                  stack: EditStack) {
+        CGImageMetadataRegisterNamespaceForPrefix(
+            md, xmpNS as CFString, xmpPrefix as CFString, nil)
+        CGImageMetadataRegisterNamespaceForPrefix(
+            md, tiffNS as CFString, tiffPrefix as CFString, nil)
+        CGImageMetadataRegisterNamespaceForPrefix(
+            md, dcNS as CFString, dcPrefix as CFString, nil)
+
+        let appVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)
+            ?? "?"
+        let creatorTool = "Photo2Mac \(appVersion)"
+        let description = humanDescription(of: stack, creator: creatorTool)
+
+        setStringTag(md, ns: xmpNS, prefix: xmpPrefix,
+                     name: "CreatorTool", value: creatorTool)
+        setStringTag(md, ns: tiffNS, prefix: tiffPrefix,
+                     name: "ImageDescription", value: description)
+        setStringTag(md, ns: dcNS, prefix: dcPrefix,
+                     name: "description", value: description)
+    }
+
+    @discardableResult
+    private static func setStringTag(_ md: CGMutableImageMetadata,
+                                       ns: String,
+                                       prefix: String,
+                                       name: String,
+                                       value: String) -> Bool {
+        guard let tag = CGImageMetadataTagCreate(
+            ns as CFString,
+            prefix as CFString,
+            name as CFString,
+            .string,
+            value as CFTypeRef
+        ) else { return false }
+        let path = "\(prefix):\(name)" as CFString
+        return CGImageMetadataSetTagWithPath(md, nil, path, tag)
+    }
+
+    /// One-line human-readable summary of the edits applied.
+    private static func humanDescription(of s: EditStack, creator: String) -> String {
+        if s.isNeutral {
+            return "\(creator) — fara editari"
+        }
+        var parts: [String] = []
+        if abs(s.rotateDegrees) > 0.0001 {
+            parts.append(String(format: "rotire %.2f°", s.rotateDegrees))
+        }
+        if s.flipHorizontal { parts.append("flip orizontal") }
+        if s.flipVertical { parts.append("flip vertical") }
+        if let c = s.crop {
+            parts.append(String(format: "decupare %d%%×%d%% la (%d%%, %d%%)",
+                                 Int(c.width * 100), Int(c.height * 100),
+                                 Int(c.x * 100), Int(c.y * 100)))
+        }
+        let adj = s.adjustments
+        if adj.brightness != 0 {
+            parts.append(String(format: "luminozitate %+d", Int((adj.brightness * 100).rounded())))
+        }
+        if adj.contrast != 0 {
+            parts.append(String(format: "contrast %+d", Int((adj.contrast * 100).rounded())))
+        }
+        if adj.saturation != 0 {
+            parts.append(String(format: "saturatie %+d", Int((adj.saturation * 100).rounded())))
+        }
+        if adj.exposure != 0 {
+            parts.append(String(format: "expunere %+.2f EV", adj.exposure))
+        }
+        return "\(creator) — " + parts.joined(separator: ", ")
     }
 
     /// Best-effort UTI for a file URL based on extension.
