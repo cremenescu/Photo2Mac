@@ -246,8 +246,29 @@ struct InspectorView: View {
     }
 }
 
+struct RecentMenu: View {
+    @ObservedObject private var recents = RecentFiles.shared
+
+    var body: some View {
+        Menu("Deschide recente") {
+            if recents.urls.isEmpty {
+                Text("Niciun fisier recent").foregroundStyle(.secondary)
+            } else {
+                ForEach(recents.urls, id: \.self) { url in
+                    Button(url.lastPathComponent) {
+                        WorkspaceHolder.shared.workspace.open(url: url)
+                    }
+                }
+                Divider()
+                Button("Goleste lista") { recents.clear() }
+            }
+        }
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var recents = RecentFiles.shared
 
     var body: some View {
         Form {
@@ -260,6 +281,19 @@ struct SettingsView: View {
                         Text(z.label).tag(z)
                     }
                 }
+            }
+            Section("Fisiere recente") {
+                Stepper(value: Binding(
+                    get: { settings.maxRecentItems },
+                    set: { newVal in
+                        settings.maxRecentItems = newVal
+                        recents.trim(to: newVal)
+                    }
+                ), in: 1...50) {
+                    Text("Numar maxim: \(settings.maxRecentItems)")
+                }
+                Button("Goleste lista") { recents.clear() }
+                    .disabled(recents.urls.isEmpty)
             }
         }
         .formStyle(.grouped)

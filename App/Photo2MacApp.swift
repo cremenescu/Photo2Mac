@@ -51,13 +51,15 @@ struct Photo2MacApp: App {
                     WorkspaceHolder.shared.workspace.openPanel()
                 }
                 .keyboardShortcut("o", modifiers: [.command])
+
+                RecentMenu()
             }
-            CommandGroup(replacing: .saveItem) {
+            CommandGroup(after: .newItem) {
+                Divider()
                 Button("Inchide tab") {
                     WorkspaceHolder.shared.workspace.closeSelected()
                 }
                 .keyboardShortcut("w", modifiers: [.command])
-                .disabled(WorkspaceHolder.shared.workspace.documents.isEmpty)
 
                 Button("Inchide fereastra") {
                     NSApp.keyWindow?.close()

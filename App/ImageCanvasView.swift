@@ -26,6 +26,8 @@ final class CanvasNSView: NSView {
     override var isOpaque: Bool { false }
     override var acceptsFirstResponder: Bool { true }
 
+    var onUserInteract: (() -> Void)?
+
     private var trackingArea: NSTrackingArea?
     private var lastDragWindowPoint: NSPoint?
 
@@ -74,13 +76,25 @@ final class CanvasNSView: NSView {
         let dy = current.y - last.y
         let mag = scroll.magnification == 0 ? 1 : scroll.magnification
 
+        // Window coords: y is up-positive. Flipped clipView origin: y down-positive.
+        // Mouse moves right (dx>0) => image follows right => viewport reveals content
+        //   to the left => origin.x decreases.
+        // Mouse moves up (dy>0)    => image follows up    => viewport reveals content
+        //   above => in flipped doc coords (y down), "above" = smaller y => origin.y
+        //   decreases. Since dy>0 here, we want origin.y -= dy. WAIT: in flipped
+        //   clipView, origin.y INCREASES as we scroll down. So scrolling up = origin.y
+        //   DECREASES. Mouse up (dy>0 in window coords) wants image follow up = scroll
+        //   up = origin.y -= dy. But because of the flip, contentView.bounds.origin.y
+        //   semantics already accounts for flip => actually subtracting dy is wrong;
+        //   we need to ADD dy because clipView origin in flipped doc has opposite
+        //   direction to window y.
         var origin = scroll.contentView.bounds.origin
         origin.x -= dx / mag
-        // Flipped view: dragging up should move content up (origin y increases)
-        origin.y -= dy / mag
+        origin.y += dy / mag
         scroll.contentView.scroll(to: origin)
         scroll.reflectScrolledClipView(scroll.contentView)
         lastDragWindowPoint = current
+        onUserInteract?()
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -130,6 +144,8 @@ struct ImageCanvasView: NSViewRepresentable {
 
     final class Coordinator {
         var fittedDocumentID: UUID?
+        var userInteracted = false
+        var frameObserver: NSObjectProtocol?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -150,15 +166,35 @@ struct ImageCanvasView: NSViewRepresentable {
         canvas.image = image
         canvas.panEnabled = (tool == .hand)
         canvas.frame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
+        canvas.onUserInteract = { [weak coord = context.coordinator] in
+            coord?.userInteracted = true
+        }
         scroll.documentView = canvas
 
         scroll.contentView.postsBoundsChangedNotifications = true
+        scroll.contentView.postsFrameChangedNotifications = true
+
         NotificationCenter.default.addObserver(
             forName: NSScrollView.didEndLiveMagnifyNotification,
             object: scroll,
             queue: .main
         ) { _ in
             zoom = scroll.magnification
+            context.coordinator.userInteracted = true
+        }
+
+        // Auto re-fit / re-center on viewport resize until user manually interacts.
+        context.coordinator.frameObserver = NotificationCenter.default.addObserver(
+            forName: NSView.frameDidChangeNotification,
+            object: scroll.contentView,
+            queue: .main
+        ) { [weak scroll] _ in
+            guard let scroll = scroll else { return }
+            if !context.coordinator.userInteracted {
+                applyInitialFit(scroll: scroll)
+            } else {
+                ensureImageVisible(scroll: scroll)
+            }
         }
 
         return scroll
@@ -173,6 +209,7 @@ struct ImageCanvasView: NSViewRepresentable {
             canvas.image = image
             canvas.frame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
             context.coordinator.fittedDocumentID = nil
+            context.coordinator.userInteracted = false
         }
 
         if context.coordinator.fittedDocumentID != documentID {
@@ -180,6 +217,7 @@ struct ImageCanvasView: NSViewRepresentable {
             scheduleInitialFit(scroll: scroll, coordinator: context.coordinator)
         } else if abs(scroll.magnification - zoom) > 0.001 {
             scroll.magnification = zoom
+            context.coordinator.userInteracted = true
         }
     }
 
@@ -207,15 +245,16 @@ struct ImageCanvasView: NSViewRepresentable {
     }
 
     private func applyInitialFit(scroll: NSScrollView) {
-        let viewport = scroll.contentView.bounds.size
+        let viewportPoints = scroll.frame.size
         let imgSize = image.size
-        guard viewport.width > 0, viewport.height > 0,
+        guard viewportPoints.width > 0, viewportPoints.height > 0,
               imgSize.width > 0, imgSize.height > 0 else { return }
 
-        let fitMag = min(viewport.width / imgSize.width,
-                         viewport.height / imgSize.height)
-        let fillMag = max(viewport.width / imgSize.width,
-                          viewport.height / imgSize.height)
+        // viewportPoints is screen-space (independent of magnification).
+        let fitMag = min(viewportPoints.width / imgSize.width,
+                         viewportPoints.height / imgSize.height)
+        let fillMag = max(viewportPoints.width / imgSize.width,
+                          viewportPoints.height / imgSize.height)
 
         let mag: CGFloat
         switch initialZoomMode {
@@ -227,13 +266,36 @@ struct ImageCanvasView: NSViewRepresentable {
         zoom = mag
 
         guard let canvas = scroll.documentView else { return }
-        let canvasCenter = NSPoint(x: canvas.bounds.midX, y: canvas.bounds.midY)
+        // After setting magnification, contentView.bounds.size is in doc coords
+        // (= viewport / mag). Center on canvas mid.
         let visible = scroll.contentView.bounds.size
+        let canvasCenter = NSPoint(x: canvas.bounds.midX, y: canvas.bounds.midY)
         let origin = NSPoint(
-            x: canvasCenter.x - visible.width / (2 * mag),
-            y: canvasCenter.y - visible.height / (2 * mag)
+            x: canvasCenter.x - visible.width / 2,
+            y: canvasCenter.y - visible.height / 2
         )
         scroll.contentView.scroll(to: origin)
         scroll.reflectScrolledClipView(scroll.contentView)
+    }
+
+    private func ensureImageVisible(scroll: NSScrollView) {
+        guard let canvas = scroll.documentView else { return }
+        let visible = scroll.contentView.bounds
+        let imgSize = image.size
+        let imgRect = NSRect(
+            x: (canvas.bounds.width - imgSize.width) / 2,
+            y: (canvas.bounds.height - imgSize.height) / 2,
+            width: imgSize.width,
+            height: imgSize.height
+        )
+        if !visible.intersects(imgRect) {
+            // Image fully scrolled out of view — bring it back to center.
+            let origin = NSPoint(
+                x: imgRect.midX - visible.width / 2,
+                y: imgRect.midY - visible.height / 2
+            )
+            scroll.contentView.scroll(to: origin)
+            scroll.reflectScrolledClipView(scroll.contentView)
+        }
     }
 }

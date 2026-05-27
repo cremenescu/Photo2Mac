@@ -65,7 +65,7 @@ final class Workspace: ObservableObject {
         let doc = OpenImage(url: url, image: img)
         documents.append(doc)
         selectedID = doc.id
-        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+        RecentFiles.shared.add(url)
         return doc
     }
 

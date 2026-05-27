@@ -7,6 +7,7 @@ final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
     @AppStorage("initialZoomMode") var initialZoomModeRaw: String = InitialZoom.fit.rawValue
+    @AppStorage("maxRecentItems") var maxRecentItems: Int = 10
 
     var initialZoomMode: InitialZoom {
         get { InitialZoom(rawValue: initialZoomModeRaw) ?? .fit }
