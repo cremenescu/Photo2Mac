@@ -98,8 +98,10 @@ struct WorkspaceView: View {
                 .help("Micsoreaza")
                 .disabled(workspace.selected == nil)
 
-                Text("\(Int(zoom * 100))%")
-                    .frame(width: 48)
+                Text(verbatim: String(format: "%d%%", Int((zoom * 100).rounded())))
+                    .frame(minWidth: 56)
+                    .lineLimit(1)
+                    .fixedSize()
                     .monospacedDigit()
                     .foregroundStyle(workspace.selected == nil ? Color.secondary : Color.primary)
 
@@ -269,6 +271,14 @@ struct InspectorView: View {
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     }
+                case .rotate:
+                    if let doc = workspace.selected {
+                        RotateInspector(doc: doc)
+                    } else {
+                        Text("Deschide o imagine pentru rotire.")
+                            .foregroundStyle(.secondary)
+                            .font(.callout)
+                    }
                 default:
                     Text("Parametri \(tool.label) — in dezvoltare")
                         .foregroundStyle(.secondary)
@@ -300,6 +310,111 @@ struct InspectorView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+struct RotateInspector: View {
+    @ObservedObject var doc: OpenImage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Button {
+                    rotate(by: -90)
+                } label: {
+                    Label {
+                        Text("-90°")
+                    } icon: {
+                        IconifyImage(name: "rotate-left", size: 16)
+                    }
+                    .labelStyle(.titleAndIcon)
+                }
+                Button {
+                    rotate(by: 90)
+                } label: {
+                    Label {
+                        Text("+90°")
+                    } icon: {
+                        IconifyImage(name: "rotate-right", size: 16)
+                    }
+                    .labelStyle(.titleAndIcon)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    doc.stack.flipHorizontal.toggle()
+                } label: {
+                    Label {
+                        Text("Orizontal")
+                    } icon: {
+                        IconifyImage(name: "flip-h", size: 16)
+                    }
+                    .labelStyle(.titleAndIcon)
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(doc.stack.flipHorizontal ? Color.accentColor.opacity(0.18) : Color.clear)
+                )
+                Button {
+                    doc.stack.flipVertical.toggle()
+                } label: {
+                    Label {
+                        Text("Vertical")
+                    } icon: {
+                        IconifyImage(name: "flip-v", size: 16)
+                    }
+                    .labelStyle(.titleAndIcon)
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(doc.stack.flipVertical ? Color.accentColor.opacity(0.18) : Color.clear)
+                )
+            }
+
+            Divider().padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Stare")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text("Rotire: \(doc.stack.rotateDegrees)°")
+                        .font(.callout)
+                        .monospacedDigit()
+                    if doc.stack.flipHorizontal {
+                        Text("• Flip H")
+                            .font(.callout)
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    if doc.stack.flipVertical {
+                        Text("• Flip V")
+                            .font(.callout)
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button("Reseteaza") {
+                    doc.stack.rotateDegrees = 0
+                    doc.stack.flipHorizontal = false
+                    doc.stack.flipVertical = false
+                }
+                .disabled(doc.stack.rotateDegrees == 0
+                          && !doc.stack.flipHorizontal
+                          && !doc.stack.flipVertical)
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    private func rotate(by delta: Int) {
+        var r = doc.stack.rotateDegrees + delta
+        // Normalize to [0, 360)
+        r = ((r % 360) + 360) % 360
+        doc.stack.rotateDegrees = r
     }
 }
 
