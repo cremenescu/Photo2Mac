@@ -28,6 +28,7 @@ struct WorkspaceView: View {
     @State private var tool: EditorTool = .hand
     @State private var zoom: CGFloat = 1.0
     @State private var showInspector: Bool = true
+    @State private var forceFitNonce: Int = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,7 +48,8 @@ struct WorkspaceView: View {
                                             zoom: $zoom,
                                             initialZoomMode: settings.initialZoomMode,
                                             tool: tool,
-                                            viewportSize: proxy.size)
+                                            viewportSize: proxy.size,
+                                            forceFitNonce: forceFitNonce)
                         } else {
                             EmptyWorkspaceView()
                         }
@@ -112,6 +114,26 @@ struct WorkspaceView: View {
                 .help("Marime reala (100%)")
                 .disabled(workspace.selected == nil)
 
+                Menu {
+                    ForEach(InitialZoom.allCases) { mode in
+                        Button {
+                            settings.initialZoomMode = mode
+                            forceFitNonce &+= 1
+                        } label: {
+                            if settings.initialZoomMode == mode {
+                                Label(mode.label, systemImage: "checkmark")
+                            } else {
+                                Text(mode.label)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "viewfinder")
+                        .font(.system(size: 15, weight: .regular))
+                }
+                .help("Mod vizualizare")
+                .disabled(workspace.selected == nil)
+
                 Toggle(isOn: $showInspector) {
                     IconifyImage(name: "inspector", size: 16)
                 }
@@ -129,6 +151,7 @@ struct CanvasContainer: View {
     let initialZoomMode: InitialZoom
     let tool: EditorTool
     let viewportSize: CGSize
+    let forceFitNonce: Int
 
     var body: some View {
         ImageCanvasView(image: doc.displayImage,
@@ -136,7 +159,8 @@ struct CanvasContainer: View {
                         initialZoomMode: initialZoomMode,
                         tool: tool,
                         documentID: doc.id,
-                        viewportSize: viewportSize)
+                        viewportSize: viewportSize,
+                        forceFitNonce: forceFitNonce)
     }
 }
 

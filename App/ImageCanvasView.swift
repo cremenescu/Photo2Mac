@@ -187,12 +187,15 @@ struct ImageCanvasView: NSViewRepresentable {
     let tool: EditorTool
     let documentID: UUID
     let viewportSize: CGSize
+    /// Bumped by the toolbar's "View" menu to force a re-fit on demand.
+    let forceFitNonce: Int
 
     final class Coordinator {
         var fittedDocumentID: UUID?
         var lastDocumentID: UUID?
         var userInteracted = false
         var lastViewportSize: CGSize = .zero
+        var lastForceFitNonce: Int = 0
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -266,8 +269,16 @@ struct ImageCanvasView: NSViewRepresentable {
                               abs(context.coordinator.lastViewportSize.height - viewportSize.height) > 0.5
         context.coordinator.lastViewportSize = viewportSize
 
+        let forceFit = forceFitNonce != context.coordinator.lastForceFitNonce
+        context.coordinator.lastForceFitNonce = forceFitNonce
+
         if context.coordinator.fittedDocumentID != documentID {
             scheduleInitialFit(scroll: scroll, coordinator: context.coordinator)
+        } else if forceFit {
+            DispatchQueue.main.async {
+                context.coordinator.userInteracted = false
+                applyInitialFit(scroll: scroll)
+            }
         } else if viewportChanged {
             // SwiftUI told us the viewport changed (window resize, splitter drag).
             DispatchQueue.main.async {
