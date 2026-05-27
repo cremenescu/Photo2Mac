@@ -550,11 +550,16 @@ struct ImageCanvasView: NSViewRepresentable {
         let fillMag = max(viewportPoints.width / imgSize.width,
                           viewportPoints.height / imgSize.height)
 
-        let mag: CGFloat
+        var mag: CGFloat
         switch initialZoomMode {
         case .fit: mag = min(1.0, fitMag)
         case .actual: mag = 1.0
         case .fill: mag = fillMag
+        }
+        // Leave margin around the image when in crop mode so corner handles
+        // are easily reachable, not hugging the viewport edge.
+        if cropEditState != nil {
+            mag *= 0.9
         }
         scroll.magnification = mag
         zoom = mag

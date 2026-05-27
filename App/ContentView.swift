@@ -70,12 +70,17 @@ struct WorkspaceView: View {
         .onOpenURL { url in
             workspace.open(url: url)
         }
-        .onChange(of: tool) { _, newTool in
+        .onChange(of: tool) { oldTool, newTool in
             // Leaving crop tool without explicit Apply/Cancel = cancel (revert).
             if newTool != .crop, let s = cropEdit.state,
                let doc = workspace.selected {
                 doc.stack.crop = s.originalStackCrop
                 cropEdit.state = nil
+            }
+            // Re-fit on crop entry/exit (entering = 90% fit so corner handles
+            // are reachable; leaving = back to normal fit).
+            if oldTool == .crop || newTool == .crop {
+                forceFitNonce &+= 1
             }
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
