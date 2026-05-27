@@ -79,30 +79,23 @@ final class CanvasNSView: NSView {
         guard panEnabled,
               let last = lastDragWindowPoint,
               let scroll = enclosingScrollView else { return }
-        // Keep closed-hand cursor pinned through the drag; tracking-area
-        // cursorUpdate runs constantly and would otherwise reset it to openHand.
         NSCursor.closedHand.set()
         let current = event.locationInWindow
         let dx = current.x - last.x
         let dy = current.y - last.y
         let mag = scroll.magnification == 0 ? 1 : scroll.magnification
 
-        // Window coords: y is up-positive. Flipped clipView origin: y down-positive.
-        // Mouse moves right (dx>0) => image follows right => viewport reveals content
-        //   to the left => origin.x decreases.
-        // Mouse moves up (dy>0)    => image follows up    => viewport reveals content
-        //   above => in flipped doc coords (y down), "above" = smaller y => origin.y
-        //   decreases. Since dy>0 here, we want origin.y -= dy. WAIT: in flipped
-        //   clipView, origin.y INCREASES as we scroll down. So scrolling up = origin.y
-        //   DECREASES. Mouse up (dy>0 in window coords) wants image follow up = scroll
-        //   up = origin.y -= dy. But because of the flip, contentView.bounds.origin.y
-        //   semantics already accounts for flip => actually subtracting dy is wrong;
-        //   we need to ADD dy because clipView origin in flipped doc has opposite
-        //   direction to window y.
+        // See sign rationale in commit history. y is flipped between window
+        // (up positive) and the clipView (down positive after isFlipped doc).
         var origin = scroll.contentView.bounds.origin
         origin.x -= dx / mag
         origin.y += dy / mag
-        scroll.contentView.scroll(to: origin)
+
+        // scroll(to:) on NSClipView bypasses constrainBoundsRect, so call it
+        // manually for clamping.
+        let proposed = NSRect(origin: origin, size: scroll.contentView.bounds.size)
+        let clamped = scroll.contentView.constrainBoundsRect(proposed)
+        scroll.contentView.scroll(to: clamped.origin)
         scroll.reflectScrolledClipView(scroll.contentView)
         lastDragWindowPoint = current
         onUserInteract?()
@@ -145,6 +138,42 @@ final class CanvasNSView: NSView {
                  fraction: 1.0,
                  respectFlipped: true,
                  hints: [.interpolation: NSImageInterpolation.high.rawValue])
+    }
+}
+
+/// ClipView that clamps the scroll origin so the image always intersects
+/// the viewport by at least `minOverlap` on each axis. Applies uniformly to
+/// trackpad scroll, mouse drag pan, and programmatic scrolls.
+final class CanvasClipView: NSClipView {
+    /// Image rect in document (canvas) coordinates. Set by the canvas.
+    var imageRect: CGRect = .zero
+
+    override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
+        var bounds = super.constrainBoundsRect(proposedBounds)
+        guard imageRect.width > 0, imageRect.height > 0,
+              bounds.width > 0, bounds.height > 0 else {
+            return bounds
+        }
+        // We want a consistent visible overlap regardless of zoom, so express
+        // the minimum overlap in screen points and convert to doc-points.
+        let mag = enclosingScrollView?.magnification ?? 1.0
+        let minOverlapScreen: CGFloat = 80
+        let minOverlapDoc = minOverlapScreen / max(mag, 0.0001)
+        let minSide = min(imageRect.width, imageRect.height)
+        // Cap at half the smaller side so it never exceeds image dimensions.
+        let overlap = min(minOverlapDoc, minSide * 0.5)
+
+        let maxX = imageRect.maxX - overlap
+        let minX = imageRect.minX + overlap - bounds.width
+        let maxY = imageRect.maxY - overlap
+        let minY = imageRect.minY + overlap - bounds.height
+
+        // If image fits entirely (viewport bigger than image with the overlap
+        // requirement), keep image visible by clamping origin so image rect is
+        // wholly inside the viewport.
+        bounds.origin.x = (minX <= maxX) ? max(minX, min(maxX, bounds.origin.x)) : bounds.origin.x
+        bounds.origin.y = (minY <= maxY) ? max(minY, min(maxY, bounds.origin.y)) : bounds.origin.y
+        return bounds
     }
 }
 
@@ -215,10 +244,18 @@ struct ImageCanvasView: NSViewRepresentable {
         scroll.drawsBackground = true
         scroll.borderType = .noBorder
 
+        // Replace the default clipView with our clamping one.
+        let clamping = CanvasClipView()
+        clamping.drawsBackground = true
+        clamping.backgroundColor = scroll.backgroundColor
+        scroll.contentView = clamping
+
         let canvas = CanvasNSView()
         canvas.image = image
         canvas.panEnabled = (tool == .hand)
-        canvas.frame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
+        let cFrame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
+        canvas.frame = cFrame
+        updateImageRect(clipView: clamping, canvasFrame: cFrame, image: image)
         canvas.onUserInteract = { [weak coord = context.coordinator] in
             coord?.userInteracted = true
         }
@@ -262,9 +299,17 @@ struct ImageCanvasView: NSViewRepresentable {
             // Only refit frame + state if it's actually a new document.
             // A re-render of the same document (slider tick) keeps zoom & pan.
             if docChanged {
-                canvas.frame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
+                let cFrame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
+                canvas.frame = cFrame
+                if let clip = scroll.contentView as? CanvasClipView {
+                    updateImageRect(clipView: clip, canvasFrame: cFrame, image: image)
+                }
                 context.coordinator.fittedDocumentID = nil
                 context.coordinator.userInteracted = false
+            } else if let clip = scroll.contentView as? CanvasClipView {
+                // Same document, possibly re-rendered with different geometry
+                // (e.g. crop applied later). Update image rect.
+                updateImageRect(clipView: clip, canvasFrame: canvas.frame, image: image)
             }
         }
 
@@ -358,23 +403,23 @@ struct ImageCanvasView: NSViewRepresentable {
     }
 
     private func ensureImageVisible(scroll: NSScrollView) {
-        guard let canvas = scroll.documentView else { return }
-        let visible = scroll.contentView.bounds
+        // With CanvasClipView's constrainBoundsRect, the image is always at
+        // least minOverlap visible. Re-tickle the clipView so it re-clamps
+        // its current origin under the new viewport size.
+        let origin = scroll.contentView.bounds.origin
+        scroll.contentView.scroll(to: origin)
+        scroll.reflectScrolledClipView(scroll.contentView)
+    }
+
+    private func updateImageRect(clipView: CanvasClipView,
+                                  canvasFrame: NSRect,
+                                  image: NSImage) {
         let imgSize = image.size
-        let imgRect = NSRect(
-            x: (canvas.bounds.width - imgSize.width) / 2,
-            y: (canvas.bounds.height - imgSize.height) / 2,
+        clipView.imageRect = NSRect(
+            x: (canvasFrame.width - imgSize.width) / 2,
+            y: (canvasFrame.height - imgSize.height) / 2,
             width: imgSize.width,
             height: imgSize.height
         )
-        if !visible.intersects(imgRect) {
-            // Image fully scrolled out of view — bring it back to center.
-            let origin = NSPoint(
-                x: imgRect.midX - visible.width / 2,
-                y: imgRect.midY - visible.height / 2
-            )
-            scroll.contentView.scroll(to: origin)
-            scroll.reflectScrolledClipView(scroll.contentView)
-        }
     }
 }
