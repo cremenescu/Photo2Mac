@@ -19,9 +19,13 @@ public enum ImageRenderer {
     }()
 
     /// Render the original image through the stack and return a new NSImage.
-    public static func render(original: NSImage, stack: EditStack) -> NSImage {
+    /// `sourceCI` lets callers avoid re-converting NSImage->CIImage on every render
+    /// (slider live preview hammers this path).
+    public static func render(original: NSImage,
+                              sourceCI: CIImage? = nil,
+                              stack: EditStack) -> NSImage {
         guard !stack.isNeutral else { return original }
-        guard let ciIn = makeCIImage(from: original) else { return original }
+        guard let ciIn = sourceCI ?? makeCIImage(from: original) else { return original }
 
         var ci = ciIn
 

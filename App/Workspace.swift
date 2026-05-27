@@ -3,12 +3,14 @@
 
 import SwiftUI
 import AppKit
+import CoreImage
 import UniformTypeIdentifiers
 
 final class OpenImage: ObservableObject, Identifiable, Equatable {
     let id = UUID()
     let url: URL
     let originalImage: NSImage
+    let sourceCIImage: CIImage?
     @Published var displayImage: NSImage
     @Published var stack: EditStack {
         didSet {
@@ -23,31 +25,34 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
         self.originalImage = image
         self.displayImage = image
         self.stack = EditStack()
+        // Convert source to CIImage once. Subsequent renders skip the
+        // costly NSImage->CGImage->CIImage round-trip.
+        self.sourceCIImage = ImageRenderer.makeCIImage(from: image)
     }
 
     var displayName: String { url.lastPathComponent }
 
     private var pendingRender: DispatchWorkItem?
     private let renderQueue = DispatchQueue(label: "ro.cremenescu.Photo2Mac.render",
-                                             qos: .userInitiated)
+                                             qos: .userInteractive)
 
-    /// Debounced render: cheap slider drag won't queue dozens of renders.
+    /// Render off the main thread; cancels in-flight on next tick.
     func rerender() {
         pendingRender?.cancel()
         let stackSnapshot = stack
         let original = originalImage
+        let ci = sourceCIImage
         let work = DispatchWorkItem { [weak self] in
-            let rendered = ImageRenderer.render(original: original, stack: stackSnapshot)
+            let rendered = ImageRenderer.render(original: original, sourceCI: ci, stack: stackSnapshot)
             DispatchQueue.main.async {
                 guard let self else { return }
-                // Only apply if stack hasn't moved on while we were rendering.
                 if self.stack == stackSnapshot {
                     self.displayImage = rendered
                 }
             }
         }
         pendingRender = work
-        renderQueue.asyncAfter(deadline: .now() + 0.02, execute: work)
+        renderQueue.async(execute: work)
     }
 
     static func == (lhs: OpenImage, rhs: OpenImage) -> Bool { lhs.id == rhs.id }
