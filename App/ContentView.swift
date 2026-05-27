@@ -251,11 +251,14 @@ struct CanvasContainer: View {
     let alwaysRefitOnResize: Bool
     let cropEditState: CropEditState?
 
-    /// When crop tool is active, show the ORIGINAL image (not the
-    /// already-cropped displayImage) so the user can draw a fresh crop on the
-    /// full canvas. When Apply commits, the new crop replaces stack.crop.
+    /// When crop tool is active, show the image with flip/rotate/adjustments
+    /// applied but crop temporarily disabled — so the user picks a fresh crop
+    /// region on the ALREADY ROTATED / FLIPPED image, not on the raw original.
+    /// When Apply commits, the new crop replaces stack.crop and the renderer
+    /// re-applies it on top of rotate/flip.
     private var imageToShow: NSImage {
-        cropEditState != nil ? doc.originalImage : doc.displayImage
+        if let s = cropEditState { return s.preCropImage }
+        return doc.displayImage
     }
 
     var body: some View {
@@ -518,10 +521,10 @@ struct CropInspector: View {
 
     private func ensureCropState() {
         if holder.state == nil {
-            holder.state = CropEditState(imageSize: doc.originalImage.size,
-                                          currentCrop: doc.stack.crop)
-            // While editing, render the original (so the user sees the whole
-            // image and can choose any new crop region).
+            // Renders the post-flip/post-rotate/post-adjustments image (with
+            // crop disabled) so the user can crop on what they SEE — including
+            // any rotation they already applied.
+            holder.state = CropEditState(doc: doc)
             doc.stack.crop = nil
         }
     }

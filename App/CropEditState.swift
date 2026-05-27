@@ -3,6 +3,7 @@
 
 import Foundation
 import CoreGraphics
+import AppKit
 
 enum CropAspect: String, CaseIterable, Identifiable {
     // Order matters: this is the order shown in the picker.
@@ -43,7 +44,9 @@ enum CropAspect: String, CaseIterable, Identifiable {
 }
 
 /// Live state of the crop tool while user is dragging handles.
-/// `rect` is in IMAGE PIXEL coordinates of the ORIGINAL (uncropped) image.
+/// `rect` is in IMAGE PIXEL coordinates of the IMAGE SHOWN WHILE EDITING —
+/// which has flip + rotate applied (so cropping happens on what the user sees
+/// after orientation changes), but NOT crop or adjustments-after-crop.
 final class CropEditState: ObservableObject {
     @Published var rect: CGRect
     @Published var aspect: CropAspect = .original {
@@ -56,18 +59,32 @@ final class CropEditState: ObservableObject {
     /// The crop that was in `doc.stack.crop` when the user entered crop mode.
     /// On Cancel we restore this; on Apply we replace with `rect` normalized.
     let originalStackCrop: CropRect?
+    /// Size of the image shown while editing (post-rotate / post-flip).
     let imageSize: CGSize
+    /// Image to display behind the crop overlay. Reflects the stack with
+    /// crop temporarily disabled, so the user can pick a new crop region on
+    /// the already-rotated / already-adjusted image.
+    let preCropImage: NSImage
 
-    init(imageSize: CGSize, currentCrop: CropRect?) {
-        self.imageSize = imageSize
-        self.originalStackCrop = currentCrop
-        if let c = currentCrop {
-            self.rect = CGRect(x: c.x * imageSize.width,
-                               y: c.y * imageSize.height,
-                               width: c.width * imageSize.width,
-                               height: c.height * imageSize.height)
+    init(doc: OpenImage) {
+        // Render the image with crop disabled but every other operation
+        // (flip, rotate, adjustments) applied. This is what the user sees
+        // while choosing a new crop region.
+        var without = doc.stack
+        without.crop = nil
+        let pre = ImageRenderer.render(original: doc.originalImage,
+                                         sourceCI: doc.sourceCIImage,
+                                         stack: without)
+        self.preCropImage = pre
+        self.imageSize = pre.size
+        self.originalStackCrop = doc.stack.crop
+        if let c = doc.stack.crop {
+            self.rect = CGRect(x: c.x * pre.size.width,
+                               y: c.y * pre.size.height,
+                               width: c.width * pre.size.width,
+                               height: c.height * pre.size.height)
         } else {
-            self.rect = CGRect(origin: .zero, size: imageSize)
+            self.rect = CGRect(origin: .zero, size: pre.size)
         }
     }
 
