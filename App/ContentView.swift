@@ -109,6 +109,7 @@ struct WorkspaceView: View {
                 Divider()
 
                 UndoRedoButtons(doc: workspace.selected)
+                EditsListButton(doc: workspace.selected)
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -161,6 +162,41 @@ struct WorkspaceView: View {
 
 /// Observes the OpenImage so re-renders (slider live updates) propagate.
 /// WorkspaceView only observes `Workspace`, not the individual document.
+/// Toolbar button + popover with the list of currently-applied edits.
+/// Disabled when there's nothing to show.
+struct EditsListButton: View {
+    let doc: OpenImage?
+
+    var body: some View {
+        if let doc = doc {
+            EditsListButtonActive(doc: doc)
+        } else {
+            Button {} label: { IconifyImage(name: "edits", size: 18) }
+                .help("Editari")
+                .disabled(true)
+        }
+    }
+}
+
+private struct EditsListButtonActive: View {
+    @ObservedObject var doc: OpenImage
+    @State private var presented = false
+
+    var body: some View {
+        Button {
+            presented.toggle()
+        } label: {
+            IconifyImage(name: "edits", size: 18)
+        }
+        .help("Lista editari aplicate")
+        .disabled(doc.stack.isNeutral)
+        .popover(isPresented: $presented, arrowEdge: .top) {
+            EditsListView(doc: doc)
+                .frame(width: 320)
+        }
+    }
+}
+
 /// Undo/Redo toolbar buttons that observe the current document's history so
 /// they enable/disable reactively as the user makes edits.
 struct UndoRedoButtons: View {
