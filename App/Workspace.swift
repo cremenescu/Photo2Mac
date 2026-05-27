@@ -8,29 +8,49 @@ import UniformTypeIdentifiers
 final class OpenImage: ObservableObject, Identifiable, Equatable {
     let id = UUID()
     let url: URL
-    @Published var image: NSImage
-    @Published var stack = EditStack()
+    let originalImage: NSImage
+    @Published var displayImage: NSImage
+    @Published var stack: EditStack {
+        didSet {
+            if stack != oldValue {
+                rerender()
+            }
+        }
+    }
 
     init(url: URL, image: NSImage) {
         self.url = url
-        self.image = image
+        self.originalImage = image
+        self.displayImage = image
+        self.stack = EditStack()
     }
 
     var displayName: String { url.lastPathComponent }
 
+    private var pendingRender: DispatchWorkItem?
+    private let renderQueue = DispatchQueue(label: "ro.cremenescu.Photo2Mac.render",
+                                             qos: .userInitiated)
+
+    /// Debounced render: cheap slider drag won't queue dozens of renders.
+    func rerender() {
+        pendingRender?.cancel()
+        let stackSnapshot = stack
+        let original = originalImage
+        let work = DispatchWorkItem { [weak self] in
+            let rendered = ImageRenderer.render(original: original, stack: stackSnapshot)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                // Only apply if stack hasn't moved on while we were rendering.
+                if self.stack == stackSnapshot {
+                    self.displayImage = rendered
+                }
+            }
+        }
+        pendingRender = work
+        renderQueue.asyncAfter(deadline: .now() + 0.02, execute: work)
+    }
+
     static func == (lhs: OpenImage, rhs: OpenImage) -> Bool { lhs.id == rhs.id }
-}
-
-struct EditStack: Codable, Equatable {
-    var operations: [EditOperation] = []
-}
-
-enum EditOperation: Codable, Equatable {
-    case crop(x: Double, y: Double, w: Double, h: Double)
-    case rotate(degrees: Int)
-    case flipHorizontal
-    case flipVertical
-    case adjustments(brightness: Double, contrast: Double, saturation: Double, exposure: Double)
 }
 
 final class Workspace: ObservableObject {

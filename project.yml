@@ -14,6 +14,16 @@ settings:
     DEAD_CODE_STRIPPING: YES
     GENERATE_INFOPLIST_FILE: NO
 
+schemes:
+  Photo2Mac:
+    build:
+      targets:
+        Photo2Mac: all
+        Photo2MacTests: [test]
+    test:
+      targets:
+        - Photo2MacTests
+
 targets:
   Photo2Mac:
     type: application
@@ -57,3 +67,17 @@ targets:
               - public.tiff
               - org.webmproject.webp
               - public.avif
+
+  Photo2MacTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+    dependencies:
+      - target: Photo2Mac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ro.cremenescu.Photo2MacTests
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Photo2Mac.app/Contents/MacOS/Photo2Mac

@@ -5,7 +5,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum EditorTool: String, CaseIterable, Identifiable {
-    case hand, crop, rotate, text, arrow, rect, blur
+    case hand, crop, rotate, tune, text, arrow, rect, blur
     var id: String { rawValue }
     var iconName: String { rawValue }
     var label: String {
@@ -13,6 +13,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .hand: return "Mutare"
         case .crop: return "Decupare"
         case .rotate: return "Rotire"
+        case .tune: return "Ajustari"
         case .text: return "Text"
         case .arrow: return "Sageata"
         case .rect: return "Dreptunghi"
@@ -42,7 +43,7 @@ struct WorkspaceView: View {
                             .ignoresSafeArea()
 
                         if let doc = workspace.selected {
-                            ImageCanvasView(image: doc.image,
+                            ImageCanvasView(image: doc.displayImage,
                                             zoom: $zoom,
                                             initialZoomMode: settings.initialZoomMode,
                                             tool: tool,
@@ -215,20 +216,31 @@ struct InspectorView: View {
 
             Divider()
 
-            switch tool {
-            case .hand:
-                Text("Click-drag pentru a misca imaginea in workspace. Trackpad: scroll pentru pan, pinch pentru zoom.")
-                    .foregroundStyle(.secondary)
-                    .font(.callout)
-            default:
-                Text("Parametri \(tool.label) — in dezvoltare")
-                    .foregroundStyle(.secondary)
-                    .font(.callout)
+            Group {
+                switch tool {
+                case .hand:
+                    Text("Click-drag pentru a misca imaginea in workspace. Trackpad: scroll pentru pan, pinch pentru zoom.")
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                case .tune:
+                    if let doc = workspace.selected {
+                        TuneInspector(doc: doc)
+                    } else {
+                        Text("Deschide o imagine pentru a ajusta.")
+                            .foregroundStyle(.secondary)
+                            .font(.callout)
+                    }
+                default:
+                    Text("Parametri \(tool.label) — in dezvoltare")
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                }
             }
 
             Spacer()
 
             if let doc = workspace.selected {
+                Divider()
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Fisier")
                         .font(.caption)
@@ -241,7 +253,7 @@ struct InspectorView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.top, 4)
-                    Text("\(Int(doc.image.size.width)) x \(Int(doc.image.size.height)) px")
+                    Text("\(Int(doc.originalImage.size.width)) x \(Int(doc.originalImage.size.height)) px")
                         .font(.callout)
                         .monospacedDigit()
                 }
@@ -249,6 +261,100 @@ struct InspectorView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+struct TuneInspector: View {
+    @ObservedObject var doc: OpenImage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AdjustmentSlider(
+                label: "Luminozitate",
+                value: Binding(
+                    get: { doc.stack.adjustments.brightness },
+                    set: { doc.stack.adjustments.brightness = $0 }
+                ),
+                range: -1...1
+            )
+            AdjustmentSlider(
+                label: "Contrast",
+                value: Binding(
+                    get: { doc.stack.adjustments.contrast },
+                    set: { doc.stack.adjustments.contrast = $0 }
+                ),
+                range: -1...1
+            )
+            AdjustmentSlider(
+                label: "Saturatie",
+                value: Binding(
+                    get: { doc.stack.adjustments.saturation },
+                    set: { doc.stack.adjustments.saturation = $0 }
+                ),
+                range: -1...1
+            )
+            AdjustmentSlider(
+                label: "Expunere",
+                value: Binding(
+                    get: { doc.stack.adjustments.exposure },
+                    set: { doc.stack.adjustments.exposure = $0 }
+                ),
+                range: -3...3,
+                unit: " EV"
+            )
+
+            HStack {
+                Spacer()
+                Button("Reseteaza") {
+                    doc.stack.adjustments.reset()
+                }
+                .disabled(doc.stack.adjustments.isNeutral)
+            }
+            .padding(.top, 6)
+        }
+    }
+}
+
+struct AdjustmentSlider: View {
+    let label: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var unit: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(label)
+                    .font(.callout)
+                Spacer()
+                Text(displayValue)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 42, alignment: .trailing)
+            }
+            HStack(spacing: 6) {
+                Slider(value: $value, in: range) { _ in }
+                Button {
+                    value = 0
+                } label: {
+                    Image(systemName: "arrow.uturn.backward.circle")
+                        .font(.system(size: 13))
+                        .foregroundStyle(value == 0 ? .tertiary : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Reseteaza \(label)")
+                .disabled(value == 0)
+            }
+        }
+    }
+
+    private var displayValue: String {
+        if abs(unit.isEmpty ? value * 100 : value) < 0.01 { return "0\(unit)" }
+        if unit.isEmpty {
+            return String(format: "%+d", Int((value * 100).rounded()))
+        }
+        return String(format: "%+.2f\(unit)", value)
     }
 }
 
