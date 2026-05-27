@@ -374,7 +374,7 @@ struct InspectorView: View {
                         .font(.callout)
                 case .tune:
                     if let doc = workspace.selected {
-                        TuneInspector(doc: doc)
+                        TuneInspector(doc: doc, tool: $tool)
                     } else {
                         Text("Deschide o imagine pentru a ajusta.")
                             .foregroundStyle(.secondary)
@@ -382,7 +382,7 @@ struct InspectorView: View {
                     }
                 case .rotate:
                     if let doc = workspace.selected {
-                        RotateInspector(doc: doc)
+                        RotateInspector(doc: doc, tool: $tool)
                     } else {
                         Text("Deschide o imagine pentru rotire.")
                             .foregroundStyle(.secondary)
@@ -564,8 +564,8 @@ struct CropInspector: View {
 
 struct RotateInspector: View {
     @ObservedObject var doc: OpenImage
-    @State private var preEditSnapshot: EditStack?
-    @State private var angleText: String = ""
+    @Binding var tool: EditorTool
+    @State private var preToolSnap: EditStack?
 
     private static let formatter: NumberFormatter = {
         let f = NumberFormatter()
@@ -583,9 +583,7 @@ struct RotateInspector: View {
                 Button {
                     rotate(by: -90)
                 } label: {
-                    Label {
-                        Text("-90°")
-                    } icon: {
+                    Label { Text("-90°") } icon: {
                         IconifyImage(name: "rotate-left", size: 16)
                     }
                     .labelStyle(.titleAndIcon)
@@ -593,9 +591,7 @@ struct RotateInspector: View {
                 Button {
                     rotate(by: 90)
                 } label: {
-                    Label {
-                        Text("+90°")
-                    } icon: {
+                    Label { Text("+90°") } icon: {
                         IconifyImage(name: "rotate-right", size: 16)
                     }
                     .labelStyle(.titleAndIcon)
@@ -611,10 +607,7 @@ struct RotateInspector: View {
                     TextField("", value: Binding(
                         get: { doc.stack.rotateDegrees },
                         set: { newValue in
-                            let clamped = max(-180, min(180, newValue))
-                            doc.commitChange {
-                                doc.stack.rotateDegrees = clamped
-                            }
+                            doc.stack.rotateDegrees = max(-180, min(180, newValue))
                         }
                     ), formatter: Self.formatter)
                     .textFieldStyle(.roundedBorder)
@@ -624,26 +617,16 @@ struct RotateInspector: View {
                 Slider(value: Binding(
                     get: { doc.stack.rotateDegrees },
                     set: { v in
-                        // Snap to 0.01 to avoid float noise.
                         doc.stack.rotateDegrees = (v * 100).rounded() / 100
                     }
-                ), in: -180...180) { editing in
-                    if editing {
-                        if preEditSnapshot == nil { preEditSnapshot = doc.stack }
-                    } else if let snap = preEditSnapshot {
-                        doc.commitSnapshot(snap)
-                        preEditSnapshot = nil
-                    }
-                }
+                ), in: -180...180)
             }
 
             HStack(spacing: 8) {
                 Button {
-                    doc.commitChange { doc.stack.flipHorizontal.toggle() }
+                    doc.stack.flipHorizontal.toggle()
                 } label: {
-                    Label {
-                        Text("Orizontal")
-                    } icon: {
+                    Label { Text("Orizontal") } icon: {
                         IconifyImage(name: "flip-h", size: 16)
                     }
                     .labelStyle(.titleAndIcon)
@@ -653,11 +636,9 @@ struct RotateInspector: View {
                         .fill(doc.stack.flipHorizontal ? Color.accentColor.opacity(0.18) : Color.clear)
                 )
                 Button {
-                    doc.commitChange { doc.stack.flipVertical.toggle() }
+                    doc.stack.flipVertical.toggle()
                 } label: {
-                    Label {
-                        Text("Vertical")
-                    } icon: {
+                    Label { Text("Vertical") } icon: {
                         IconifyImage(name: "flip-v", size: 16)
                     }
                     .labelStyle(.titleAndIcon)
@@ -691,37 +672,73 @@ struct RotateInspector: View {
                 }
             }
 
+            Divider().padding(.vertical, 4)
+
             HStack {
+                Button("Anuleaza") { cancel() }
                 Spacer()
-                Button("Reseteaza") {
-                    doc.commitChange {
-                        doc.stack.rotateDegrees = 0
-                        doc.stack.flipHorizontal = false
-                        doc.stack.flipVertical = false
-                    }
-                }
-                .disabled(abs(doc.stack.rotateDegrees) < 0.0001
-                          && !doc.stack.flipHorizontal
-                          && !doc.stack.flipVertical)
+                Button("Aplica") { apply() }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!hasPendingChanges)
             }
+
+            Button {
+                doc.stack.rotateDegrees = 0
+                doc.stack.flipHorizontal = false
+                doc.stack.flipVertical = false
+            } label: {
+                Text("Reseteaza rotire / flip")
+                    .frame(maxWidth: .infinity)
+            }
+            .disabled(abs(doc.stack.rotateDegrees) < 0.0001
+                      && !doc.stack.flipHorizontal
+                      && !doc.stack.flipVertical)
             .padding(.top, 4)
+        }
+        .onAppear {
+            if preToolSnap == nil { preToolSnap = doc.stack }
+        }
+        .onDisappear {
+            if let snap = preToolSnap, snap != doc.stack {
+                doc.commitSnapshot(snap)
+            }
+            preToolSnap = nil
         }
     }
 
-    private func rotate(by delta: Double) {
-        doc.commitChange {
-            var r = doc.stack.rotateDegrees + delta
-            // Normalize to [-180, 180] for natural slider feel.
-            while r > 180 { r -= 360 }
-            while r <= -180 { r += 360 }
-            doc.stack.rotateDegrees = r
+    private var hasPendingChanges: Bool {
+        guard let snap = preToolSnap else { return false }
+        return snap != doc.stack
+    }
+
+    private func apply() {
+        if let snap = preToolSnap, snap != doc.stack {
+            doc.commitSnapshot(snap)
         }
+        preToolSnap = doc.stack
+    }
+
+    private func cancel() {
+        if let snap = preToolSnap {
+            doc.stack = snap
+        }
+        preToolSnap = nil
+        tool = .hand
+    }
+
+    private func rotate(by delta: Double) {
+        var r = doc.stack.rotateDegrees + delta
+        while r > 180 { r -= 360 }
+        while r <= -180 { r += 360 }
+        doc.stack.rotateDegrees = r
     }
 }
 
 struct TuneInspector: View {
     @ObservedObject var doc: OpenImage
-    @State private var preEditSnapshot: EditStack?
+    @Binding var tool: EditorTool
+    @State private var preToolSnap: EditStack?
     @State private var histogramMode: HistogramMode = .rgb
 
     var body: some View {
@@ -753,9 +770,7 @@ struct TuneInspector: View {
                     get: { doc.stack.adjustments.brightness },
                     set: { doc.stack.adjustments.brightness = $0 }
                 ),
-                range: -1...1,
-                onBeginEdit: beginSliderEdit,
-                onEndEdit: endSliderEdit
+                range: -1...1
             )
             AdjustmentSlider(
                 label: "Contrast",
@@ -763,9 +778,7 @@ struct TuneInspector: View {
                     get: { doc.stack.adjustments.contrast },
                     set: { doc.stack.adjustments.contrast = $0 }
                 ),
-                range: -1...1,
-                onBeginEdit: beginSliderEdit,
-                onEndEdit: endSliderEdit
+                range: -1...1
             )
             AdjustmentSlider(
                 label: "Saturatie",
@@ -773,9 +786,7 @@ struct TuneInspector: View {
                     get: { doc.stack.adjustments.saturation },
                     set: { doc.stack.adjustments.saturation = $0 }
                 ),
-                range: -1...1,
-                onBeginEdit: beginSliderEdit,
-                onEndEdit: endSliderEdit
+                range: -1...1
             )
             AdjustmentSlider(
                 label: "Expunere",
@@ -784,22 +795,60 @@ struct TuneInspector: View {
                     set: { doc.stack.adjustments.exposure = $0 }
                 ),
                 range: -3...3,
-                unit: " EV",
-                onBeginEdit: beginSliderEdit,
-                onEndEdit: endSliderEdit
+                unit: " EV"
             )
 
+            Divider().padding(.vertical, 4)
+
             HStack {
+                Button("Anuleaza") { cancel() }
                 Spacer()
-                Button("Reseteaza") {
-                    doc.commitChange {
-                        doc.stack.adjustments.reset()
-                    }
-                }
-                .disabled(doc.stack.adjustments.isNeutral)
+                Button("Aplica") { apply() }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!hasPendingChanges)
             }
-            .padding(.top, 6)
+
+            Button {
+                doc.stack.adjustments.reset()
+            } label: {
+                Text("Reseteaza ajustarile")
+                    .frame(maxWidth: .infinity)
+            }
+            .disabled(doc.stack.adjustments.isNeutral)
+            .padding(.top, 4)
         }
+        .onAppear {
+            if preToolSnap == nil { preToolSnap = doc.stack }
+        }
+        .onDisappear {
+            // User left the tool without explicit Apply/Cancel: implicit apply
+            // so their edits survive in history.
+            if let snap = preToolSnap, snap != doc.stack {
+                doc.commitSnapshot(snap)
+            }
+            preToolSnap = nil
+        }
+    }
+
+    private var hasPendingChanges: Bool {
+        guard let snap = preToolSnap else { return false }
+        return snap != doc.stack
+    }
+
+    private func apply() {
+        if let snap = preToolSnap, snap != doc.stack {
+            doc.commitSnapshot(snap)
+        }
+        preToolSnap = doc.stack  // new baseline; stay in tool
+    }
+
+    private func cancel() {
+        if let snap = preToolSnap {
+            doc.stack = snap
+        }
+        preToolSnap = nil
+        tool = .hand
     }
 
     private func histogram(for image: NSImage) -> Histogram {
@@ -807,19 +856,6 @@ struct TuneInspector: View {
             return .empty
         }
         return HistogramComputer.compute(from: ci) ?? .empty
-    }
-
-    private func beginSliderEdit() {
-        // Capture the stack as it was BEFORE the drag started. We commit this
-        // snapshot to history on drag end so multiple sub-pixel ticks coalesce
-        // into a single undoable action.
-        if preEditSnapshot == nil { preEditSnapshot = doc.stack }
-    }
-
-    private func endSliderEdit() {
-        guard let snap = preEditSnapshot else { return }
-        doc.commitSnapshot(snap)
-        preEditSnapshot = nil
     }
 }
 
