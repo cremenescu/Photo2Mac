@@ -141,6 +141,34 @@ final class ImageRendererTests: XCTestCase {
 
     // MARK: - Equatable
 
+    // MARK: - Histogram
+
+    func testHistogramReturns256Bins() throws {
+        let img = solidImage(width: 32, height: 32, color: .red)
+        let ci = try XCTUnwrap(ImageRenderer.makeCIImage(from: img))
+        let h = try XCTUnwrap(HistogramComputer.compute(from: ci))
+        XCTAssertEqual(h.binCount, 256)
+        XCTAssertEqual(h.luminance.count, 256)
+    }
+
+    func testHistogramRedFixtureSpikesInRed() throws {
+        // Pure red 32x32 image → red channel should dominate, blue/green near 0.
+        let img = solidImage(width: 32, height: 32, color: .red)
+        let ci = try XCTUnwrap(ImageRenderer.makeCIImage(from: img))
+        let h = try XCTUnwrap(HistogramComputer.compute(from: ci))
+        let redMax = h.red.max() ?? 0
+        let greenMax = h.green.max() ?? 0
+        let blueMax = h.blue.max() ?? 0
+        XCTAssertGreaterThan(redMax, 0)
+        // Red dominates the upper half of bins, G and B should peak in low bins.
+        let argmaxRed = h.red.firstIndex(of: redMax) ?? 0
+        let argmaxGreen = h.green.firstIndex(of: greenMax) ?? 0
+        let argmaxBlue = h.blue.firstIndex(of: blueMax) ?? 0
+        XCTAssertGreaterThan(argmaxRed, 200, "Red should peak near top of range")
+        XCTAssertLessThan(argmaxGreen, 30, "Green should peak near bottom")
+        XCTAssertLessThan(argmaxBlue, 30, "Blue should peak near bottom")
+    }
+
     func testEditStackEquatable() {
         var a = EditStack()
         var b = EditStack()

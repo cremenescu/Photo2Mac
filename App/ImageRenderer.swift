@@ -40,7 +40,7 @@ public enum ImageRenderer {
             ci = ci.transformed(by: CGAffineTransform(scaleX: 1, y: -1))
                    .transformed(by: CGAffineTransform(translationX: 0, y: ci.extent.height))
         }
-        if stack.rotateDegrees != 0 {
+        if abs(stack.rotateDegrees) > 0.0001 {
             let rad = -CGFloat(stack.rotateDegrees) * .pi / 180.0  // CG is CCW, UI is CW
             let rotated = ci.transformed(by: CGAffineTransform(rotationAngle: rad))
             // Translate back to origin (0,0) for clean extent.

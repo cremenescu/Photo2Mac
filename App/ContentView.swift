@@ -528,6 +528,18 @@ struct CropInspector: View {
 
 struct RotateInspector: View {
     @ObservedObject var doc: OpenImage
+    @State private var preEditSnapshot: EditStack?
+    @State private var angleText: String = ""
+
+    private static let formatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.maximumFractionDigits = 2
+        f.minimumFractionDigits = 0
+        f.allowsFloats = true
+        f.usesGroupingSeparator = false
+        return f
+    }()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -551,6 +563,41 @@ struct RotateInspector: View {
                         IconifyImage(name: "rotate-right", size: 16)
                     }
                     .labelStyle(.titleAndIcon)
+                }
+            }
+
+            // Fine rotation: -180 .. +180 in 0.01° steps.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Unghi (°)")
+                        .font(.callout)
+                    Spacer()
+                    TextField("", value: Binding(
+                        get: { doc.stack.rotateDegrees },
+                        set: { newValue in
+                            let clamped = max(-180, min(180, newValue))
+                            doc.commitChange {
+                                doc.stack.rotateDegrees = clamped
+                            }
+                        }
+                    ), formatter: Self.formatter)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+                    .monospacedDigit()
+                }
+                Slider(value: Binding(
+                    get: { doc.stack.rotateDegrees },
+                    set: { v in
+                        // Snap to 0.01 to avoid float noise.
+                        doc.stack.rotateDegrees = (v * 100).rounded() / 100
+                    }
+                ), in: -180...180) { editing in
+                    if editing {
+                        if preEditSnapshot == nil { preEditSnapshot = doc.stack }
+                    } else if let snap = preEditSnapshot {
+                        doc.commitSnapshot(snap)
+                        preEditSnapshot = nil
+                    }
                 }
             }
 
@@ -592,7 +639,7 @@ struct RotateInspector: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 6) {
-                    Text("Rotire: \(doc.stack.rotateDegrees)°")
+                    Text(String(format: "Rotire: %.2f°", doc.stack.rotateDegrees))
                         .font(.callout)
                         .monospacedDigit()
                     if doc.stack.flipHorizontal {
@@ -617,7 +664,7 @@ struct RotateInspector: View {
                         doc.stack.flipVertical = false
                     }
                 }
-                .disabled(doc.stack.rotateDegrees == 0
+                .disabled(abs(doc.stack.rotateDegrees) < 0.0001
                           && !doc.stack.flipHorizontal
                           && !doc.stack.flipVertical)
             }
@@ -625,10 +672,12 @@ struct RotateInspector: View {
         }
     }
 
-    private func rotate(by delta: Int) {
+    private func rotate(by delta: Double) {
         doc.commitChange {
             var r = doc.stack.rotateDegrees + delta
-            r = ((r % 360) + 360) % 360
+            // Normalize to [-180, 180] for natural slider feel.
+            while r > 180 { r -= 360 }
+            while r <= -180 { r += 360 }
             doc.stack.rotateDegrees = r
         }
     }
@@ -637,9 +686,31 @@ struct RotateInspector: View {
 struct TuneInspector: View {
     @ObservedObject var doc: OpenImage
     @State private var preEditSnapshot: EditStack?
+    @State private var histogramMode: HistogramMode = .rgb
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Histogram with channel-mode picker.
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Histograma")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("", selection: $histogramMode) {
+                        ForEach(HistogramMode.allCases) { m in
+                            Text(m.label).tag(m)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 130)
+                }
+                HistogramView(histogram: histogram(for: doc.displayImage),
+                              mode: histogramMode)
+            }
+            Divider().padding(.vertical, 2)
+
             AdjustmentSlider(
                 label: "Luminozitate",
                 value: Binding(
@@ -693,6 +764,13 @@ struct TuneInspector: View {
             }
             .padding(.top, 6)
         }
+    }
+
+    private func histogram(for image: NSImage) -> Histogram {
+        guard let ci = ImageRenderer.makeCIImage(from: image) else {
+            return .empty
+        }
+        return HistogramComputer.compute(from: ci) ?? .empty
     }
 
     private func beginSliderEdit() {

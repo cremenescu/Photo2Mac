@@ -8,7 +8,9 @@ import CoreGraphics
 /// Persisted (eventually) as JSON inside the file's XMP metadata.
 public struct EditStack: Codable, Equatable {
     public var crop: CropRect? = nil
-    public var rotateDegrees: Int = 0          // 0, 90, 180, 270 (clockwise)
+    /// Clockwise rotation in degrees. Now Double so the inspector slider can
+    /// nudge by 0.01 for precise straightening (not just 90-degree presets).
+    public var rotateDegrees: Double = 0
     public var flipHorizontal: Bool = false
     public var flipVertical: Bool = false
     public var adjustments: Adjustments = Adjustments()
@@ -17,7 +19,7 @@ public struct EditStack: Codable, Equatable {
 
     public var isNeutral: Bool {
         crop == nil
-            && rotateDegrees == 0
+            && abs(rotateDegrees) < 0.0001
             && !flipHorizontal && !flipVertical
             && adjustments.isNeutral
     }
