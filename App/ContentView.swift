@@ -424,11 +424,10 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             settingsForm
-                .frame(maxWidth: .infinity, alignment: .top)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: 520, minHeight: 420)
     }
 
     private var settingsForm: some View {

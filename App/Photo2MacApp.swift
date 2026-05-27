@@ -13,37 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NotificationCenter.default.addObserver(
             forName: NSWindow.didBecomeKeyNotification,
-            object: nil,
-            queue: .main
+            object: nil, queue: .main
         ) { note in
-            guard let win = note.object as? NSWindow else { return }
-            win.tabbingMode = .disallowed
-            // SwiftUI Settings scene creates a fixed-size window even when
-            // .windowResizability(.contentMinSize) is set. Force-add resizable
-            // styleMask + reasonable min/max sizes for the prefs window.
-            if win.identifier?.rawValue.contains("settings") == true
-                || win.title.contains("Settings")
-                || win.title.contains("Preferences") {
-                Self.makeWindowResizable(win)
-                // Re-apply shortly after — SwiftUI may overwrite styleMask
-                // when it finishes its own setup pass.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    Self.makeWindowResizable(win)
-                }
-            }
-        }
-    }
-
-    static func makeWindowResizable(_ win: NSWindow) {
-        win.styleMask.insert(.resizable)
-        win.contentMinSize = NSSize(width: 520, height: 420)
-        win.contentMaxSize = NSSize(width: 1600, height: 1200)
-        win.minSize = NSSize(width: 520, height: 420)
-        win.maxSize = NSSize(width: 1600, height: 1200)
-        if win.frame.size.width < 620 || win.frame.size.height < 500 {
-            var frame = win.frame
-            frame.size = NSSize(width: 640, height: 540)
-            win.setFrame(frame, display: true, animate: false)
+            (note.object as? NSWindow)?.tabbingMode = .disallowed
         }
     }
 
@@ -90,6 +62,19 @@ final class WorkspaceHolder {
     let workspace = Workspace()
 }
 
+struct PreferencesCommand: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            Button("Preferinte...") {
+                openWindow(id: "preferences")
+            }
+            .keyboardShortcut(",", modifiers: [.command])
+        }
+    }
+}
+
 @main
 struct Photo2MacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -125,10 +110,14 @@ struct Photo2MacApp: App {
                 }
                 .keyboardShortcut("w", modifiers: [.command, .shift])
             }
+            PreferencesCommand()
         }
 
-        Settings {
+        Window("Preferinte", id: "preferences") {
             SettingsView()
         }
+        .defaultSize(width: 640, height: 540)
+        .defaultPosition(.center)
+        .windowResizability(.contentMinSize)
     }
 }
