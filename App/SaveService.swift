@@ -6,6 +6,16 @@ import UniformTypeIdentifiers
 
 enum SaveService {
 
+    /// Save back to the file the document was opened from (overwrite).
+    /// macOS automatically captures a filesystem version via NSFileVersion
+    /// so the user can recover the previous content from Finder if needed.
+    @discardableResult
+    static func saveInPlace(doc: OpenImage) -> URL? {
+        // Best-effort version snapshot before overwrite.
+        _ = try? NSFileVersion.addOfItem(at: doc.url, withContentsOf: doc.url)
+        return write(doc: doc, to: doc.url)
+    }
+
     /// Show NSSavePanel with sensible defaults, then render + write XMP.
     /// Returns the URL that was written, or nil if user cancelled / write failed.
     @discardableResult

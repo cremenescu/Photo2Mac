@@ -75,6 +75,30 @@ struct PreferencesCommand: Commands {
     }
 }
 
+struct SaveCommands: Commands {
+    @ObservedObject private var workspace = WorkspaceHolder.shared.workspace
+
+    var body: some Commands {
+        CommandGroup(replacing: .saveItem) {
+            Button(t("Salveaza")) {
+                if let doc = workspace.selected {
+                    _ = SaveService.saveInPlace(doc: doc)
+                }
+            }
+            .keyboardShortcut("s", modifiers: [.command])
+            .disabled(workspace.selected == nil)
+
+            Button(t("Salveaza ca...")) {
+                if let doc = workspace.selected {
+                    _ = SaveService.saveAs(doc: doc)
+                }
+            }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+            .disabled(workspace.selected == nil)
+        }
+    }
+}
+
 struct UndoRedoCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .undoRedo) {
@@ -129,14 +153,7 @@ struct Photo2MacApp: App {
                 }
                 .keyboardShortcut("w", modifiers: [.command, .shift])
             }
-            CommandGroup(replacing: .saveItem) {
-                Button(t("Salveaza ca...")) {
-                    if let doc = WorkspaceHolder.shared.workspace.selected {
-                        _ = SaveService.saveAs(doc: doc)
-                    }
-                }
-                .keyboardShortcut("s", modifiers: [.command])
-            }
+            SaveCommands()
             PreferencesCommand()
             UndoRedoCommands()
         }
