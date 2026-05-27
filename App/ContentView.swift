@@ -109,12 +109,6 @@ struct WorkspaceView: View {
                 .help("Mareste")
                 .disabled(workspace.selected == nil)
 
-                Button {
-                    zoom = 1.0
-                } label: { IconifyImage(name: "zoom-actual", size: 16) }
-                .help("Marime reala (100%)")
-                .disabled(workspace.selected == nil)
-
                 Menu {
                     ForEach(InitialZoom.allCases) { mode in
                         Button {
@@ -428,6 +422,16 @@ struct SettingsView: View {
     @ObservedObject private var recents = RecentFiles.shared
 
     var body: some View {
+        ScrollView {
+            settingsForm
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var settingsForm: some View {
         Form {
             Section("Vizualizare") {
                 Picker("Zoom initial la deschidere", selection: Binding(
