@@ -189,6 +189,9 @@ struct ImageCanvasView: NSViewRepresentable {
     let viewportSize: CGSize
     /// Bumped by the toolbar's "View" menu to force a re-fit on demand.
     let forceFitNonce: Int
+    /// When true, every viewport resize re-applies the current zoom mode
+    /// even if the user has manually panned/zoomed.
+    let alwaysRefitOnResize: Bool
 
     final class Coordinator {
         var fittedDocumentID: UUID?
@@ -282,7 +285,10 @@ struct ImageCanvasView: NSViewRepresentable {
         } else if viewportChanged {
             // SwiftUI told us the viewport changed (window resize, splitter drag).
             DispatchQueue.main.async {
-                if !context.coordinator.userInteracted {
+                if alwaysRefitOnResize || !context.coordinator.userInteracted {
+                    if alwaysRefitOnResize {
+                        context.coordinator.userInteracted = false
+                    }
                     applyInitialFit(scroll: scroll)
                 } else {
                     ensureImageVisible(scroll: scroll)

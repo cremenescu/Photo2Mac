@@ -49,7 +49,8 @@ struct WorkspaceView: View {
                                             initialZoomMode: settings.initialZoomMode,
                                             tool: tool,
                                             viewportSize: proxy.size,
-                                            forceFitNonce: forceFitNonce)
+                                            forceFitNonce: forceFitNonce,
+                                            alwaysRefitOnResize: settings.alwaysRefitOnResize)
                         } else {
                             EmptyWorkspaceView()
                         }
@@ -152,6 +153,7 @@ struct CanvasContainer: View {
     let tool: EditorTool
     let viewportSize: CGSize
     let forceFitNonce: Int
+    let alwaysRefitOnResize: Bool
 
     var body: some View {
         ImageCanvasView(image: doc.displayImage,
@@ -160,7 +162,8 @@ struct CanvasContainer: View {
                         tool: tool,
                         documentID: doc.id,
                         viewportSize: viewportSize,
-                        forceFitNonce: forceFitNonce)
+                        forceFitNonce: forceFitNonce,
+                        alwaysRefitOnResize: alwaysRefitOnResize)
     }
 }
 
@@ -435,6 +438,14 @@ struct SettingsView: View {
                         Text(z.label).tag(z)
                     }
                 }
+                Toggle("Re-aplica modul la redimensionarea ferestrei",
+                       isOn: Binding(
+                            get: { settings.alwaysRefitOnResize },
+                            set: { settings.alwaysRefitOnResize = $0 }
+                       ))
+                Text("Cand e bifat, la fiecare redimensionare imaginea revine la modul de vizualizare ales, chiar daca ai pannat/zoomat manual.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("Fisiere recente") {
                 Stepper(value: Binding(

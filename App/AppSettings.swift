@@ -8,6 +8,7 @@ final class AppSettings: ObservableObject {
 
     @AppStorage("initialZoomMode") var initialZoomModeRaw: String = InitialZoom.fit.rawValue
     @AppStorage("maxRecentItems") var maxRecentItems: Int = 10
+    @AppStorage("alwaysRefitOnResize") var alwaysRefitOnResize: Bool = false
 
     var initialZoomMode: InitialZoom {
         get { InitialZoom(rawValue: initialZoomModeRaw) ?? .fit }
