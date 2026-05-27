@@ -105,6 +105,10 @@ struct WorkspaceView: View {
                     .help(t.label)
                     .disabled(workspace.selected == nil && t != .hand)
                 }
+
+                Divider()
+
+                UndoRedoButtons(doc: workspace.selected)
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -157,6 +161,50 @@ struct WorkspaceView: View {
 
 /// Observes the OpenImage so re-renders (slider live updates) propagate.
 /// WorkspaceView only observes `Workspace`, not the individual document.
+/// Undo/Redo toolbar buttons that observe the current document's history so
+/// they enable/disable reactively as the user makes edits.
+struct UndoRedoButtons: View {
+    let doc: OpenImage?
+
+    var body: some View {
+        if let doc = doc {
+            UndoRedoButtonsActive(doc: doc, history: doc.history)
+        } else {
+            Group {
+                Button {} label: { IconifyImage(name: "undo", size: 18) }
+                    .help("Anuleaza")
+                    .disabled(true)
+                Button {} label: { IconifyImage(name: "redo", size: 18) }
+                    .help("Refa")
+                    .disabled(true)
+            }
+        }
+    }
+}
+
+private struct UndoRedoButtonsActive: View {
+    @ObservedObject var doc: OpenImage
+    @ObservedObject var history: UndoHistory
+
+    var body: some View {
+        Button {
+            doc.performUndo()
+        } label: {
+            IconifyImage(name: "undo", size: 18)
+        }
+        .help("Anuleaza ultima actiune (Cmd+Z)")
+        .disabled(!history.canUndo)
+
+        Button {
+            doc.performRedo()
+        } label: {
+            IconifyImage(name: "redo", size: 18)
+        }
+        .help("Refa ultima actiune anulata (Cmd+Shift+Z)")
+        .disabled(!history.canRedo)
+    }
+}
+
 struct CanvasContainer: View {
     @ObservedObject var doc: OpenImage
     @Binding var zoom: CGFloat
@@ -444,25 +492,37 @@ struct CropInspector: View {
 
     private func applyCrop() {
         guard let s = holder.state else { return }
+        // The original-stack snapshot was taken when entering crop mode
+        // (ensureCropState already cleared doc.stack.crop). We push that
+        // pre-edit snapshot so undo restores the prior crop (or no crop).
+        let snapshot = preCropStack(originalCrop: s.originalStackCrop)
         let n = s.normalized
-        // Treat "full image" as no crop.
         if abs(n.x) < 0.001 && abs(n.y) < 0.001 &&
             abs(n.width - 1) < 0.001 && abs(n.height - 1) < 0.001 {
             doc.stack.crop = nil
         } else {
             doc.stack.crop = n
         }
+        doc.commitSnapshot(snapshot)
         holder.state = nil
         tool = .hand
     }
 
     private func cancelCrop() {
-        // Restore the original crop value if it had been set, then exit crop mode.
+        // No history push: Cancel reverts the temp edit and leaves stack as
+        // it was when the user entered crop mode.
         if let s = holder.state {
             doc.stack.crop = s.originalStackCrop
         }
         holder.state = nil
         tool = .hand
+    }
+
+    /// Pre-edit stack = current stack with crop restored to the original value.
+    private func preCropStack(originalCrop: CropRect?) -> EditStack {
+        var s = doc.stack
+        s.crop = originalCrop
+        return s
     }
 }
 
@@ -496,7 +556,7 @@ struct RotateInspector: View {
 
             HStack(spacing: 8) {
                 Button {
-                    doc.stack.flipHorizontal.toggle()
+                    doc.commitChange { doc.stack.flipHorizontal.toggle() }
                 } label: {
                     Label {
                         Text("Orizontal")
@@ -510,7 +570,7 @@ struct RotateInspector: View {
                         .fill(doc.stack.flipHorizontal ? Color.accentColor.opacity(0.18) : Color.clear)
                 )
                 Button {
-                    doc.stack.flipVertical.toggle()
+                    doc.commitChange { doc.stack.flipVertical.toggle() }
                 } label: {
                     Label {
                         Text("Vertical")
@@ -551,9 +611,11 @@ struct RotateInspector: View {
             HStack {
                 Spacer()
                 Button("Reseteaza") {
-                    doc.stack.rotateDegrees = 0
-                    doc.stack.flipHorizontal = false
-                    doc.stack.flipVertical = false
+                    doc.commitChange {
+                        doc.stack.rotateDegrees = 0
+                        doc.stack.flipHorizontal = false
+                        doc.stack.flipVertical = false
+                    }
                 }
                 .disabled(doc.stack.rotateDegrees == 0
                           && !doc.stack.flipHorizontal
@@ -564,15 +626,17 @@ struct RotateInspector: View {
     }
 
     private func rotate(by delta: Int) {
-        var r = doc.stack.rotateDegrees + delta
-        // Normalize to [0, 360)
-        r = ((r % 360) + 360) % 360
-        doc.stack.rotateDegrees = r
+        doc.commitChange {
+            var r = doc.stack.rotateDegrees + delta
+            r = ((r % 360) + 360) % 360
+            doc.stack.rotateDegrees = r
+        }
     }
 }
 
 struct TuneInspector: View {
     @ObservedObject var doc: OpenImage
+    @State private var preEditSnapshot: EditStack?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -582,7 +646,9 @@ struct TuneInspector: View {
                     get: { doc.stack.adjustments.brightness },
                     set: { doc.stack.adjustments.brightness = $0 }
                 ),
-                range: -1...1
+                range: -1...1,
+                onBeginEdit: beginSliderEdit,
+                onEndEdit: endSliderEdit
             )
             AdjustmentSlider(
                 label: "Contrast",
@@ -590,7 +656,9 @@ struct TuneInspector: View {
                     get: { doc.stack.adjustments.contrast },
                     set: { doc.stack.adjustments.contrast = $0 }
                 ),
-                range: -1...1
+                range: -1...1,
+                onBeginEdit: beginSliderEdit,
+                onEndEdit: endSliderEdit
             )
             AdjustmentSlider(
                 label: "Saturatie",
@@ -598,7 +666,9 @@ struct TuneInspector: View {
                     get: { doc.stack.adjustments.saturation },
                     set: { doc.stack.adjustments.saturation = $0 }
                 ),
-                range: -1...1
+                range: -1...1,
+                onBeginEdit: beginSliderEdit,
+                onEndEdit: endSliderEdit
             )
             AdjustmentSlider(
                 label: "Expunere",
@@ -607,18 +677,35 @@ struct TuneInspector: View {
                     set: { doc.stack.adjustments.exposure = $0 }
                 ),
                 range: -3...3,
-                unit: " EV"
+                unit: " EV",
+                onBeginEdit: beginSliderEdit,
+                onEndEdit: endSliderEdit
             )
 
             HStack {
                 Spacer()
                 Button("Reseteaza") {
-                    doc.stack.adjustments.reset()
+                    doc.commitChange {
+                        doc.stack.adjustments.reset()
+                    }
                 }
                 .disabled(doc.stack.adjustments.isNeutral)
             }
             .padding(.top, 6)
         }
+    }
+
+    private func beginSliderEdit() {
+        // Capture the stack as it was BEFORE the drag started. We commit this
+        // snapshot to history on drag end so multiple sub-pixel ticks coalesce
+        // into a single undoable action.
+        if preEditSnapshot == nil { preEditSnapshot = doc.stack }
+    }
+
+    private func endSliderEdit() {
+        guard let snap = preEditSnapshot else { return }
+        doc.commitSnapshot(snap)
+        preEditSnapshot = nil
     }
 }
 
@@ -627,6 +714,8 @@ struct AdjustmentSlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     var unit: String = ""
+    var onBeginEdit: () -> Void = {}
+    var onEndEdit: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -641,9 +730,14 @@ struct AdjustmentSlider: View {
                     .frame(minWidth: 42, alignment: .trailing)
             }
             HStack(spacing: 6) {
-                Slider(value: $value, in: range) { _ in }
+                Slider(value: $value, in: range) { editing in
+                    if editing { onBeginEdit() } else { onEndEdit() }
+                }
                 Button {
+                    // Single-shot reset is itself an action: snapshot + set.
+                    onBeginEdit()
                     value = 0
+                    onEndEdit()
                 } label: {
                     Image(systemName: "arrow.uturn.backward.circle")
                         .font(.system(size: 13))
@@ -730,6 +824,17 @@ struct SettingsView: View {
                 }
                 Button("Goleste lista") { recents.clear() }
                     .disabled(recents.urls.isEmpty)
+            }
+            Section("Istoric (undo / redo)") {
+                Stepper(value: Binding(
+                    get: { settings.maxUndoLevels },
+                    set: { settings.maxUndoLevels = $0 }
+                ), in: 1...500) {
+                    Text("Numar maxim de actiuni: \(settings.maxUndoLevels)")
+                }
+                Text("Slider-ele coaleseaza un drag complet intr-o singura actiune.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

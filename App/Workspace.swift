@@ -19,6 +19,7 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
             }
         }
     }
+    @Published var history = UndoHistory()
 
     init(url: URL, image: NSImage) {
         self.url = url
@@ -56,6 +57,72 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
     }
 
     static func == (lhs: OpenImage, rhs: OpenImage) -> Bool { lhs.id == rhs.id }
+
+    // MARK: - Undo / Redo helpers
+
+    /// Commit a discrete action: capture the OLD stack before mutation, then
+    /// mutate via `change`. Use for one-shot actions (rotate, flip, crop apply).
+    func commitChange(_ change: () -> Void) {
+        let old = stack
+        change()
+        if stack != old {
+            history.push(old)
+        }
+    }
+
+    /// Push the given stack onto the undo history. Use for slider-style edits
+    /// where the snapshot is captured at drag-start and committed at drag-end.
+    func commitSnapshot(_ snapshot: EditStack) {
+        if snapshot != stack {
+            history.push(snapshot)
+        }
+    }
+
+    func performUndo() {
+        guard let prev = history.undo(current: stack) else { return }
+        stack = prev
+    }
+
+    func performRedo() {
+        guard let next = history.redo(current: stack) else { return }
+        stack = next
+    }
+}
+
+final class UndoHistory: ObservableObject {
+    @Published private(set) var undoStack: [EditStack] = []
+    @Published private(set) var redoStack: [EditStack] = []
+    var maxDepth: Int { max(1, AppSettings.shared.maxUndoLevels) }
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
+    func push(_ snapshot: EditStack) {
+        undoStack.append(snapshot)
+        if undoStack.count > maxDepth {
+            undoStack.removeFirst(undoStack.count - maxDepth)
+        }
+        // Any new action invalidates the redo branch.
+        redoStack.removeAll()
+    }
+
+    func undo(current: EditStack) -> EditStack? {
+        guard let prev = undoStack.popLast() else { return nil }
+        redoStack.append(current)
+        if redoStack.count > maxDepth {
+            redoStack.removeFirst(redoStack.count - maxDepth)
+        }
+        return prev
+    }
+
+    func redo(current: EditStack) -> EditStack? {
+        guard let next = redoStack.popLast() else { return nil }
+        undoStack.append(current)
+        if undoStack.count > maxDepth {
+            undoStack.removeFirst(undoStack.count - maxDepth)
+        }
+        return next
+    }
 }
 
 final class Workspace: ObservableObject {

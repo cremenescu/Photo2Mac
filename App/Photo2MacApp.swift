@@ -75,6 +75,21 @@ struct PreferencesCommand: Commands {
     }
 }
 
+struct UndoRedoCommands: Commands {
+    var body: some Commands {
+        CommandGroup(replacing: .undoRedo) {
+            Button("Anuleaza") {
+                WorkspaceHolder.shared.workspace.selected?.performUndo()
+            }
+            .keyboardShortcut("z", modifiers: [.command])
+            Button("Refa") {
+                WorkspaceHolder.shared.workspace.selected?.performRedo()
+            }
+            .keyboardShortcut("z", modifiers: [.command, .shift])
+        }
+    }
+}
+
 @main
 struct Photo2MacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -111,6 +126,7 @@ struct Photo2MacApp: App {
                 .keyboardShortcut("w", modifiers: [.command, .shift])
             }
             PreferencesCommand()
+            UndoRedoCommands()
         }
 
         Window("Preferinte", id: "preferences") {
