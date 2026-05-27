@@ -6,6 +6,20 @@ import AppKit
 import UniformTypeIdentifiers
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing = false
+        for window in NSApp.windows {
+            window.tabbingMode = .disallowed
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { note in
+            (note.object as? NSWindow)?.tabbingMode = .disallowed
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
@@ -16,6 +30,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 window.makeKeyAndOrderFront(nil)
                 return false
             }
+        }
+        return true
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        DispatchQueue.main.async {
+            for url in urls { WorkspaceHolder.shared.workspace.open(url: url) }
+        }
+    }
+
+    func application(_ sender: NSApplication, openFile filename: String) -> Bool {
+        let url = URL(fileURLWithPath: filename)
+        DispatchQueue.main.async {
+            WorkspaceHolder.shared.workspace.open(url: url)
         }
         return true
     }
@@ -39,11 +67,15 @@ final class WorkspaceHolder {
 struct Photo2MacApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    init() {
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     var body: some Scene {
         WindowGroup("Photo2Mac") {
             WorkspaceView()
                 .environmentObject(WorkspaceHolder.shared.workspace)
-                .frame(minWidth: 900, minHeight: 600)
+                .frame(minWidth: 500, minHeight: 380)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

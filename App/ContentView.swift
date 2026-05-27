@@ -36,28 +36,34 @@ struct WorkspaceView: View {
             }
 
             HSplitView {
-                ZStack {
-                    Color(NSColor(white: 0.12, alpha: 1.0))
-                        .ignoresSafeArea()
+                GeometryReader { proxy in
+                    ZStack {
+                        Color(NSColor(white: 0.12, alpha: 1.0))
+                            .ignoresSafeArea()
 
-                    if let doc = workspace.selected {
-                        ImageCanvasView(image: doc.image,
-                                        zoom: $zoom,
-                                        initialZoomMode: settings.initialZoomMode,
-                                        tool: tool,
-                                        documentID: doc.id)
-                    } else {
-                        EmptyWorkspaceView()
+                        if let doc = workspace.selected {
+                            ImageCanvasView(image: doc.image,
+                                            zoom: $zoom,
+                                            initialZoomMode: settings.initialZoomMode,
+                                            tool: tool,
+                                            documentID: doc.id,
+                                            viewportSize: proxy.size)
+                        } else {
+                            EmptyWorkspaceView()
+                        }
                     }
                 }
-                .frame(minWidth: 500, minHeight: 400)
+                .frame(minWidth: 240, minHeight: 200)
                 .layoutPriority(1)
 
                 if showInspector {
                     InspectorView(tool: tool)
-                        .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
+                        .frame(minWidth: 200, idealWidth: 260, maxWidth: 360)
                 }
             }
+        }
+        .onOpenURL { url in
+            workspace.open(url: url)
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             for p in providers {

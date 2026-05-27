@@ -150,14 +150,33 @@ final class CanvasNSView: NSView {
 
 final class CanvasScrollView: NSScrollView {
     var onResize: (() -> Void)?
-    private var lastSize: NSSize = .zero
+    private var lastReportedSize: NSSize = .zero
+
+    private func reportIfChanged() {
+        if frame.size != lastReportedSize, frame.size.width > 0, frame.size.height > 0 {
+            lastReportedSize = frame.size
+            onResize?()
+        }
+    }
 
     override func tile() {
         super.tile()
-        if frame.size != lastSize {
-            lastSize = frame.size
-            onResize?()
-        }
+        reportIfChanged()
+    }
+
+    override func layout() {
+        super.layout()
+        reportIfChanged()
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        reportIfChanged()
+    }
+
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
+        reportIfChanged()
     }
 }
 
@@ -167,11 +186,12 @@ struct ImageCanvasView: NSViewRepresentable {
     let initialZoomMode: InitialZoom
     let tool: EditorTool
     let documentID: UUID
+    let viewportSize: CGSize
 
     final class Coordinator {
         var fittedDocumentID: UUID?
         var userInteracted = false
-        var frameObserver: NSObjectProtocol?
+        var lastViewportSize: CGSize = .zero
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -234,9 +254,21 @@ struct ImageCanvasView: NSViewRepresentable {
             context.coordinator.userInteracted = false
         }
 
+        let viewportChanged = abs(context.coordinator.lastViewportSize.width - viewportSize.width) > 0.5 ||
+                              abs(context.coordinator.lastViewportSize.height - viewportSize.height) > 0.5
+        context.coordinator.lastViewportSize = viewportSize
+
         if context.coordinator.fittedDocumentID != documentID {
-            // Defer until viewport has real size.
             scheduleInitialFit(scroll: scroll, coordinator: context.coordinator)
+        } else if viewportChanged {
+            // SwiftUI told us the viewport changed (window resize, splitter drag).
+            DispatchQueue.main.async {
+                if !context.coordinator.userInteracted {
+                    applyInitialFit(scroll: scroll)
+                } else {
+                    ensureImageVisible(scroll: scroll)
+                }
+            }
         } else if abs(scroll.magnification - zoom) > 0.001 {
             scroll.magnification = zoom
             context.coordinator.userInteracted = true
