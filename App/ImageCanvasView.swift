@@ -21,6 +21,13 @@ final class CanvasNSView: NSView {
     var panEnabled: Bool = true {
         didSet { window?.invalidateCursorRects(for: self) }
     }
+    /// When non-nil, draw a crop overlay and forward drags to the crop edit state.
+    var cropEditState: CropEditState? { didSet { needsDisplay = true } }
+    /// Where the image (and so the crop overlay) is drawn within canvas bounds.
+    private var imageDrawRect: CGRect = .zero
+    /// Source-of-truth update fence: caller signals "edit state changed,
+    /// redraw" by setting this.
+    var cropRedrawNonce: Int = 0 { didSet { needsDisplay = true } }
 
     override var isFlipped: Bool { true }
     override var isOpaque: Bool { false }
@@ -69,6 +76,18 @@ final class CanvasNSView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        // Crop mode: intercept clicks if they hit the crop UI.
+        if let crop = cropEditState {
+            let p = convert(event.locationInWindow, from: nil)
+            if let handle = cropHandleHitTest(at: p, crop: crop) {
+                activeCropHandle = handle
+                dragStartCropRect = crop.rect
+                dragStartCanvasPoint = p
+                NSCursor.crosshair.set()
+                isDragging = true
+                return
+            }
+        }
         guard panEnabled else { return }
         isDragging = true
         NSCursor.closedHand.set()
@@ -76,6 +95,12 @@ final class CanvasNSView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        // Crop drag — takes priority.
+        if let crop = cropEditState, let handle = activeCropHandle {
+            let p = convert(event.locationInWindow, from: nil)
+            applyCropDrag(handle: handle, currentCanvasPoint: p, crop: crop)
+            return
+        }
         guard panEnabled,
               let last = lastDragWindowPoint,
               let scroll = enclosingScrollView else { return }
@@ -102,6 +127,12 @@ final class CanvasNSView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if activeCropHandle != nil {
+            activeCropHandle = nil
+            isDragging = false
+            NSCursor.crosshair.set()
+            return
+        }
         isDragging = false
         lastDragWindowPoint = nil
         if panEnabled, let win = window,
@@ -121,6 +152,7 @@ final class CanvasNSView: NSView {
             width: imgSize.width,
             height: imgSize.height
         )
+        imageDrawRect = rect
 
         if let ctx = NSGraphicsContext.current?.cgContext {
             ctx.saveGState()
@@ -138,6 +170,138 @@ final class CanvasNSView: NSView {
                  fraction: 1.0,
                  respectFlipped: true,
                  hints: [.interpolation: NSImageInterpolation.high.rawValue])
+
+        if let crop = cropEditState {
+            drawCropOverlay(crop: crop, in: rect)
+        }
+    }
+
+    private func drawCropOverlay(crop: CropEditState, in imgRect: CGRect) {
+        // Crop rect in canvas coords (the image inside CanvasNSView is drawn
+        // 1:1, so crop pixel coords map directly into imgRect with offset).
+        let cr = canvasRect(forImageRect: crop.rect, in: imgRect)
+
+        // Dim mask outside the crop.
+        let outside = NSBezierPath(rect: imgRect)
+        outside.append(NSBezierPath(rect: cr).reversed)
+        NSColor(white: 0, alpha: 0.5).setFill()
+        outside.fill()
+
+        // Crop border.
+        let borderColor = NSColor.white
+        borderColor.setStroke()
+        let border = NSBezierPath(rect: cr)
+        border.lineWidth = 1.5
+        border.stroke()
+
+        // Rule-of-thirds guides.
+        NSColor(white: 1, alpha: 0.4).setStroke()
+        let thirds = NSBezierPath()
+        thirds.lineWidth = 0.75
+        for i in 1...2 {
+            let x = cr.minX + cr.width * CGFloat(i) / 3.0
+            thirds.move(to: NSPoint(x: x, y: cr.minY))
+            thirds.line(to: NSPoint(x: x, y: cr.maxY))
+            let y = cr.minY + cr.height * CGFloat(i) / 3.0
+            thirds.move(to: NSPoint(x: cr.minX, y: y))
+            thirds.line(to: NSPoint(x: cr.maxX, y: y))
+        }
+        thirds.stroke()
+
+        // Corner handles.
+        let handleSize: CGFloat = 12
+        NSColor.white.setFill()
+        NSColor.black.withAlphaComponent(0.6).setStroke()
+        for h in [CropHandle.topLeft, .topRight, .bottomLeft, .bottomRight] {
+            let center = handleCenter(h, in: cr)
+            let r = NSRect(x: center.x - handleSize / 2,
+                           y: center.y - handleSize / 2,
+                           width: handleSize, height: handleSize)
+            let p = NSBezierPath(roundedRect: r, xRadius: 2, yRadius: 2)
+            p.fill()
+            p.lineWidth = 1
+            p.stroke()
+        }
+    }
+
+    private func canvasRect(forImageRect ir: CGRect, in imgRect: CGRect) -> CGRect {
+        // ir is in image-pixel coords (origin top-left of image, y-down).
+        return CGRect(x: imgRect.minX + ir.minX,
+                      y: imgRect.minY + ir.minY,
+                      width: ir.width,
+                      height: ir.height)
+    }
+
+    private func handleCenter(_ h: CropHandle, in r: CGRect) -> CGPoint {
+        switch h {
+        case .topLeft:     return CGPoint(x: r.minX, y: r.minY)
+        case .topRight:    return CGPoint(x: r.maxX, y: r.minY)
+        case .bottomLeft:  return CGPoint(x: r.minX, y: r.maxY)
+        case .bottomRight: return CGPoint(x: r.maxX, y: r.maxY)
+        case .interior:    return CGPoint(x: r.midX, y: r.midY)
+        }
+    }
+
+    private var activeCropHandle: CropHandle?
+    private var dragStartCropRect: CGRect = .zero
+    private var dragStartCanvasPoint: CGPoint = .zero
+
+    private func cropHandleHitTest(at point: CGPoint, crop: CropEditState) -> CropHandle? {
+        let cr = canvasRect(forImageRect: crop.rect, in: imageDrawRect)
+        let hitR: CGFloat = 18  // hit radius, generous
+        for h in [CropHandle.topLeft, .topRight, .bottomLeft, .bottomRight] {
+            let c = handleCenter(h, in: cr)
+            if abs(point.x - c.x) <= hitR && abs(point.y - c.y) <= hitR {
+                return h
+            }
+        }
+        if cr.contains(point) { return .interior }
+        return nil
+    }
+
+    private func applyCropDrag(handle: CropHandle, currentCanvasPoint p: CGPoint,
+                                crop: CropEditState) {
+        // dragStartCropRect is in image coords. dragStartCanvasPoint and p are
+        // in canvas coords. Image is drawn at imageDrawRect; image coords align
+        // with canvas at (imageDrawRect.minX, imageDrawRect.minY) plus offset.
+        let dx = p.x - dragStartCanvasPoint.x
+        let dy = p.y - dragStartCanvasPoint.y
+        let imgSize = crop.imageSize
+        let minSize: CGFloat = 16  // pixels in image
+
+        var r = dragStartCropRect
+
+        switch handle {
+        case .interior:
+            r.origin.x += dx
+            r.origin.y += dy
+            // Clamp within image bounds.
+            r.origin.x = max(0, min(imgSize.width - r.width, r.origin.x))
+            r.origin.y = max(0, min(imgSize.height - r.height, r.origin.y))
+        case .topLeft:
+            let newMinX = max(0, min(r.maxX - minSize, r.minX + dx))
+            let newMinY = max(0, min(r.maxY - minSize, r.minY + dy))
+            r = CGRect(x: newMinX, y: newMinY,
+                       width: r.maxX - newMinX, height: r.maxY - newMinY)
+        case .topRight:
+            let newMaxX = max(r.minX + minSize, min(imgSize.width, r.maxX + dx))
+            let newMinY = max(0, min(r.maxY - minSize, r.minY + dy))
+            r = CGRect(x: r.minX, y: newMinY,
+                       width: newMaxX - r.minX, height: r.maxY - newMinY)
+        case .bottomLeft:
+            let newMinX = max(0, min(r.maxX - minSize, r.minX + dx))
+            let newMaxY = max(r.minY + minSize, min(imgSize.height, r.maxY + dy))
+            r = CGRect(x: newMinX, y: r.minY,
+                       width: r.maxX - newMinX, height: newMaxY - r.minY)
+        case .bottomRight:
+            let newMaxX = max(r.minX + minSize, min(imgSize.width, r.maxX + dx))
+            let newMaxY = max(r.minY + minSize, min(imgSize.height, r.maxY + dy))
+            r = CGRect(x: r.minX, y: r.minY,
+                       width: newMaxX - r.minX, height: newMaxY - r.minY)
+        }
+
+        crop.rect = r
+        needsDisplay = true
     }
 }
 
@@ -221,6 +385,8 @@ struct ImageCanvasView: NSViewRepresentable {
     /// When true, every viewport resize re-applies the current zoom mode
     /// even if the user has manually panned/zoomed.
     let alwaysRefitOnResize: Bool
+    /// Active crop editing state, or nil if not in crop mode.
+    let cropEditState: CropEditState?
 
     final class Coordinator {
         var fittedDocumentID: UUID?
@@ -253,6 +419,7 @@ struct ImageCanvasView: NSViewRepresentable {
         let canvas = CanvasNSView()
         canvas.image = image
         canvas.panEnabled = (tool == .hand)
+        canvas.cropEditState = cropEditState
         let cFrame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
         canvas.frame = cFrame
         updateImageRect(clipView: clamping, canvasFrame: cFrame, image: image)
@@ -290,6 +457,9 @@ struct ImageCanvasView: NSViewRepresentable {
         guard let canvas = scroll.documentView as? CanvasNSView else { return }
 
         canvas.panEnabled = (tool == .hand)
+        if canvas.cropEditState !== cropEditState {
+            canvas.cropEditState = cropEditState
+        }
 
         let docChanged = context.coordinator.lastDocumentID != documentID
         context.coordinator.lastDocumentID = documentID

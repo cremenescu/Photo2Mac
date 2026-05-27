@@ -29,6 +29,7 @@ struct WorkspaceView: View {
     @State private var zoom: CGFloat = 1.0
     @State private var showInspector: Bool = true
     @State private var forceFitNonce: Int = 0
+    @StateObject private var cropEdit = CropEditHolder()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,7 +51,8 @@ struct WorkspaceView: View {
                                             tool: tool,
                                             viewportSize: proxy.size,
                                             forceFitNonce: forceFitNonce,
-                                            alwaysRefitOnResize: settings.alwaysRefitOnResize)
+                                            alwaysRefitOnResize: settings.alwaysRefitOnResize,
+                                            cropEditState: cropEdit.state)
                         } else {
                             EmptyWorkspaceView()
                         }
@@ -60,13 +62,21 @@ struct WorkspaceView: View {
                 .layoutPriority(1)
 
                 if showInspector {
-                    InspectorView(tool: tool)
+                    InspectorView(tool: tool, cropHolder: cropEdit)
                         .frame(minWidth: 200, idealWidth: 260, maxWidth: 360)
                 }
             }
         }
         .onOpenURL { url in
             workspace.open(url: url)
+        }
+        .onChange(of: tool) { _, newTool in
+            // Leaving crop tool without explicit Apply/Cancel = cancel (revert).
+            if newTool != .crop, let s = cropEdit.state,
+               let doc = workspace.selected {
+                doc.stack.crop = s.originalStackCrop
+                cropEdit.state = nil
+            }
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             for p in providers {
@@ -150,16 +160,25 @@ struct CanvasContainer: View {
     let viewportSize: CGSize
     let forceFitNonce: Int
     let alwaysRefitOnResize: Bool
+    let cropEditState: CropEditState?
+
+    /// When crop tool is active, show the ORIGINAL image (not the
+    /// already-cropped displayImage) so the user can draw a fresh crop on the
+    /// full canvas. When Apply commits, the new crop replaces stack.crop.
+    private var imageToShow: NSImage {
+        cropEditState != nil ? doc.originalImage : doc.displayImage
+    }
 
     var body: some View {
-        ImageCanvasView(image: doc.displayImage,
+        ImageCanvasView(image: imageToShow,
                         zoom: $zoom,
                         initialZoomMode: initialZoomMode,
                         tool: tool,
                         documentID: doc.id,
                         viewportSize: viewportSize,
                         forceFitNonce: forceFitNonce,
-                        alwaysRefitOnResize: alwaysRefitOnResize)
+                        alwaysRefitOnResize: alwaysRefitOnResize,
+                        cropEditState: cropEditState)
     }
 }
 
@@ -249,6 +268,7 @@ struct EmptyWorkspaceView: View {
 struct InspectorView: View {
     @EnvironmentObject var workspace: Workspace
     let tool: EditorTool
+    let cropHolder: CropEditHolder
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -276,6 +296,14 @@ struct InspectorView: View {
                         RotateInspector(doc: doc)
                     } else {
                         Text("Deschide o imagine pentru rotire.")
+                            .foregroundStyle(.secondary)
+                            .font(.callout)
+                    }
+                case .crop:
+                    if let doc = workspace.selected {
+                        CropInspector(doc: doc, holder: cropHolder)
+                    } else {
+                        Text("Deschide o imagine pentru decupare.")
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     }
@@ -310,6 +338,94 @@ struct InspectorView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+/// Holds the currently-active crop edit state for the workspace.
+/// Lives at WorkspaceView scope so tool switches outside crop tool don't drop
+/// the state (we just hide the overlay).
+final class CropEditHolder: ObservableObject {
+    @Published var state: CropEditState?
+}
+
+struct CropInspector: View {
+    @ObservedObject var doc: OpenImage
+    @ObservedObject var holder: CropEditHolder
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Trage colturile sau interiorul dreptunghiului pentru a defini decuparea.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            if let state = holder.state {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Dreptunghi (pixeli original)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(String(format: "%d, %d  -  %d x %d",
+                                Int(state.rect.minX), Int(state.rect.minY),
+                                Int(state.rect.width), Int(state.rect.height)))
+                        .font(.callout)
+                        .monospacedDigit()
+                }
+            }
+
+            Divider().padding(.vertical, 4)
+
+            HStack {
+                Button("Anuleaza") {
+                    cancelCrop()
+                }
+                Spacer()
+                Button("Aplica") {
+                    applyCrop()
+                }
+                .keyboardShortcut(.return, modifiers: [])
+                .buttonStyle(.borderedProminent)
+            }
+
+            Button("Reseteaza la imagine intreaga") {
+                if let s = holder.state {
+                    s.rect = CGRect(origin: .zero, size: s.imageSize)
+                }
+            }
+            .padding(.top, 4)
+        }
+        .onAppear {
+            ensureCropState()
+        }
+    }
+
+    private func ensureCropState() {
+        if holder.state == nil {
+            holder.state = CropEditState(imageSize: doc.originalImage.size,
+                                          currentCrop: doc.stack.crop)
+            // While editing, render the original (so the user sees the whole
+            // image and can choose any new crop region).
+            doc.stack.crop = nil
+        }
+    }
+
+    private func applyCrop() {
+        guard let s = holder.state else { return }
+        let n = s.normalized
+        // Treat "full image" as no crop.
+        if abs(n.x) < 0.001 && abs(n.y) < 0.001 &&
+            abs(n.width - 1) < 0.001 && abs(n.height - 1) < 0.001 {
+            doc.stack.crop = nil
+        } else {
+            doc.stack.crop = n
+        }
+        holder.state = nil
+    }
+
+    private func cancelCrop() {
+        // Restore the original crop value if it had been set, then exit crop mode.
+        if let s = holder.state {
+            doc.stack.crop = s.originalStackCrop
+        }
+        holder.state = nil
     }
 }
 
