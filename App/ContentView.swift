@@ -353,22 +353,46 @@ final class CropEditHolder: ObservableObject {
     @Published var state: CropEditState?
 }
 
+struct AspectPicker: View {
+    @ObservedObject var state: CropEditState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Raport")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Picker("", selection: Binding(
+                get: { state.aspect },
+                set: { state.aspect = $0 }
+            )) {
+                ForEach(CropAspect.allCases) { a in
+                    Text(a.label).tag(a)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+        }
+    }
+}
+
 struct CropInspector: View {
     @ObservedObject var doc: OpenImage
     @ObservedObject var holder: CropEditHolder
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Trage colturile sau interiorul dreptunghiului pentru a defini decuparea.")
+            Text("Trage colturile sau muchiile dreptunghiului. Click in interior pentru a-l muta.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
             if let state = holder.state {
+                AspectPicker(state: state)
+
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Dreptunghi (pixeli original)")
+                    Text("Dreptunghi (pixeli)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(String(format: "%d, %d  -  %d x %d",
+                    Text(String(format: "%d, %d  •  %d × %d",
                                 Int(state.rect.minX), Int(state.rect.minY),
                                 Int(state.rect.width), Int(state.rect.height)))
                         .font(.callout)
@@ -390,11 +414,16 @@ struct CropInspector: View {
                 .buttonStyle(.borderedProminent)
             }
 
-            Button("Reseteaza la imagine intreaga") {
+            Button {
                 if let s = holder.state {
+                    s.aspect = .free
                     s.rect = CGRect(origin: .zero, size: s.imageSize)
                 }
+            } label: {
+                Text("Reseteaza")
+                    .frame(maxWidth: .infinity)
             }
+            .help("Reseteaza dreptunghiul la imaginea intreaga")
             .padding(.top, 4)
         }
         .onAppear {

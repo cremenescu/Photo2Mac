@@ -208,16 +208,30 @@ final class CanvasNSView: NSView {
         }
         thirds.stroke()
 
-        // Corner handles.
-        let handleSize: CGFloat = 12
+        // Corner handles (bigger) and edge mid handles (smaller).
         NSColor.white.setFill()
         NSColor.black.withAlphaComponent(0.6).setStroke()
-        for h in [CropHandle.topLeft, .topRight, .bottomLeft, .bottomRight] {
+        let corners: [CropHandle] = [.topLeft, .topRight, .bottomLeft, .bottomRight]
+        let edges:   [CropHandle] = [.topMid, .bottomMid, .midLeft, .midRight]
+        for h in corners {
             let center = handleCenter(h, in: cr)
-            let r = NSRect(x: center.x - handleSize / 2,
-                           y: center.y - handleSize / 2,
-                           width: handleSize, height: handleSize)
+            let s: CGFloat = 12
+            let r = NSRect(x: center.x - s / 2, y: center.y - s / 2,
+                           width: s, height: s)
             let p = NSBezierPath(roundedRect: r, xRadius: 2, yRadius: 2)
+            p.fill()
+            p.lineWidth = 1
+            p.stroke()
+        }
+        for h in edges {
+            let center = handleCenter(h, in: cr)
+            // Edge handles drawn as a small pill perpendicular to their axis.
+            let isHorizontal = (h == .topMid || h == .bottomMid)
+            let w: CGFloat = isHorizontal ? 24 : 8
+            let hgt: CGFloat = isHorizontal ? 8 : 24
+            let r = NSRect(x: center.x - w / 2, y: center.y - hgt / 2,
+                           width: w, height: hgt)
+            let p = NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3)
             p.fill()
             p.lineWidth = 1
             p.stroke()
@@ -235,8 +249,12 @@ final class CanvasNSView: NSView {
     private func handleCenter(_ h: CropHandle, in r: CGRect) -> CGPoint {
         switch h {
         case .topLeft:     return CGPoint(x: r.minX, y: r.minY)
+        case .topMid:      return CGPoint(x: r.midX, y: r.minY)
         case .topRight:    return CGPoint(x: r.maxX, y: r.minY)
+        case .midLeft:     return CGPoint(x: r.minX, y: r.midY)
+        case .midRight:    return CGPoint(x: r.maxX, y: r.midY)
         case .bottomLeft:  return CGPoint(x: r.minX, y: r.maxY)
+        case .bottomMid:   return CGPoint(x: r.midX, y: r.maxY)
         case .bottomRight: return CGPoint(x: r.maxX, y: r.maxY)
         case .interior:    return CGPoint(x: r.midX, y: r.midY)
         }
@@ -248,8 +266,11 @@ final class CanvasNSView: NSView {
 
     private func cropHandleHitTest(at point: CGPoint, crop: CropEditState) -> CropHandle? {
         let cr = canvasRect(forImageRect: crop.rect, in: imageDrawRect)
-        let hitR: CGFloat = 18  // hit radius, generous
-        for h in [CropHandle.topLeft, .topRight, .bottomLeft, .bottomRight] {
+        // Test corners first (priority over edges), then edges.
+        let hitR: CGFloat = 18
+        let order: [CropHandle] = [.topLeft, .topRight, .bottomLeft, .bottomRight,
+                                    .topMid, .bottomMid, .midLeft, .midRight]
+        for h in order {
             let c = handleCenter(h, in: cr)
             if abs(point.x - c.x) <= hitR && abs(point.y - c.y) <= hitR {
                 return h
@@ -261,43 +282,94 @@ final class CanvasNSView: NSView {
 
     private func applyCropDrag(handle: CropHandle, currentCanvasPoint p: CGPoint,
                                 crop: CropEditState) {
-        // dragStartCropRect is in image coords. dragStartCanvasPoint and p are
-        // in canvas coords. Image is drawn at imageDrawRect; image coords align
-        // with canvas at (imageDrawRect.minX, imageDrawRect.minY) plus offset.
         let dx = p.x - dragStartCanvasPoint.x
         let dy = p.y - dragStartCanvasPoint.y
         let imgSize = crop.imageSize
-        let minSize: CGFloat = 16  // pixels in image
+        let minSize: CGFloat = 16
 
         var r = dragStartCropRect
+        let aspect = crop.aspect.ratio(imageSize: imgSize)
 
         switch handle {
         case .interior:
             r.origin.x += dx
             r.origin.y += dy
-            // Clamp within image bounds.
             r.origin.x = max(0, min(imgSize.width - r.width, r.origin.x))
             r.origin.y = max(0, min(imgSize.height - r.height, r.origin.y))
-        case .topLeft:
-            let newMinX = max(0, min(r.maxX - minSize, r.minX + dx))
-            let newMinY = max(0, min(r.maxY - minSize, r.minY + dy))
-            r = CGRect(x: newMinX, y: newMinY,
-                       width: r.maxX - newMinX, height: r.maxY - newMinY)
-        case .topRight:
-            let newMaxX = max(r.minX + minSize, min(imgSize.width, r.maxX + dx))
+
+        case .topLeft, .topRight, .bottomLeft, .bottomRight:
+            // Anchor = opposite corner.
+            let anchor: CGPoint
+            switch handle {
+            case .topLeft:     anchor = CGPoint(x: r.maxX, y: r.maxY)
+            case .topRight:    anchor = CGPoint(x: r.minX, y: r.maxY)
+            case .bottomLeft:  anchor = CGPoint(x: r.maxX, y: r.minY)
+            case .bottomRight: anchor = CGPoint(x: r.minX, y: r.minY)
+            default: anchor = .zero
+            }
+            // Free corner = drag-point + delta.
+            var freeX: CGFloat
+            var freeY: CGFloat
+            switch handle {
+            case .topLeft:     freeX = r.minX + dx; freeY = r.minY + dy
+            case .topRight:    freeX = r.maxX + dx; freeY = r.minY + dy
+            case .bottomLeft:  freeX = r.minX + dx; freeY = r.maxY + dy
+            case .bottomRight: freeX = r.maxX + dx; freeY = r.maxY + dy
+            default: freeX = 0; freeY = 0
+            }
+            // Clamp to image bounds.
+            freeX = max(0, min(imgSize.width, freeX))
+            freeY = max(0, min(imgSize.height, freeY))
+
+            var w = abs(freeX - anchor.x)
+            var h = abs(freeY - anchor.y)
+
+            if let aspect, aspect > 0 {
+                // Pick whichever candidate keeps the user feeling natural:
+                // the one whose ratio is closer to or above the target wins.
+                let wFromH = h * aspect
+                if wFromH > w { w = wFromH } else { h = w / aspect }
+                // Also clamp so anchored corner doesn't push past image bounds.
+                // Determine sign of expansion from anchor.
+                let dirX: CGFloat = freeX >= anchor.x ? 1 : -1
+                let dirY: CGFloat = freeY >= anchor.y ? 1 : -1
+                let maxW = dirX > 0 ? imgSize.width - anchor.x : anchor.x
+                let maxH = dirY > 0 ? imgSize.height - anchor.y : anchor.y
+                if w > maxW { w = maxW; h = w / aspect }
+                if h > maxH { h = maxH; w = h * aspect }
+                w = max(minSize, w)
+                h = max(minSize, h)
+                let signX: CGFloat = dirX
+                let signY: CGFloat = dirY
+                let newFreeX = anchor.x + signX * w
+                let newFreeY = anchor.y + signY * h
+                r = CGRect(x: min(anchor.x, newFreeX),
+                           y: min(anchor.y, newFreeY),
+                           width: w, height: h)
+            } else {
+                w = max(minSize, w)
+                h = max(minSize, h)
+                r = CGRect(x: min(anchor.x, freeX),
+                           y: min(anchor.y, freeY),
+                           width: w, height: h)
+            }
+
+        case .topMid:
             let newMinY = max(0, min(r.maxY - minSize, r.minY + dy))
             r = CGRect(x: r.minX, y: newMinY,
-                       width: newMaxX - r.minX, height: r.maxY - newMinY)
-        case .bottomLeft:
-            let newMinX = max(0, min(r.maxX - minSize, r.minX + dx))
-            let newMaxY = max(r.minY + minSize, min(imgSize.height, r.maxY + dy))
-            r = CGRect(x: newMinX, y: r.minY,
-                       width: r.maxX - newMinX, height: newMaxY - r.minY)
-        case .bottomRight:
-            let newMaxX = max(r.minX + minSize, min(imgSize.width, r.maxX + dx))
+                       width: r.width, height: r.maxY - newMinY)
+        case .bottomMid:
             let newMaxY = max(r.minY + minSize, min(imgSize.height, r.maxY + dy))
             r = CGRect(x: r.minX, y: r.minY,
-                       width: newMaxX - r.minX, height: newMaxY - r.minY)
+                       width: r.width, height: newMaxY - r.minY)
+        case .midLeft:
+            let newMinX = max(0, min(r.maxX - minSize, r.minX + dx))
+            r = CGRect(x: newMinX, y: r.minY,
+                       width: r.maxX - newMinX, height: r.height)
+        case .midRight:
+            let newMaxX = max(r.minX + minSize, min(imgSize.width, r.maxX + dx))
+            r = CGRect(x: r.minX, y: r.minY,
+                       width: newMaxX - r.minX, height: r.height)
         }
 
         crop.rect = r
