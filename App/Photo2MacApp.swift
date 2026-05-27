@@ -72,7 +72,7 @@ struct Photo2MacApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Photo2Mac") {
+        Window("Photo2Mac", id: "main") {
             WorkspaceView()
                 .environmentObject(WorkspaceHolder.shared.workspace)
                 .frame(minWidth: 500, minHeight: 380)
