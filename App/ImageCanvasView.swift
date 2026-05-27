@@ -30,6 +30,7 @@ final class CanvasNSView: NSView {
 
     private var trackingArea: NSTrackingArea?
     private var lastDragWindowPoint: NSPoint?
+    private var isDragging = false
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -46,7 +47,9 @@ final class CanvasNSView: NSView {
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        if panEnabled {
+        if isDragging {
+            NSCursor.closedHand.set()
+        } else if panEnabled {
             NSCursor.openHand.set()
         } else {
             NSCursor.arrow.set()
@@ -54,15 +57,20 @@ final class CanvasNSView: NSView {
     }
 
     override func mouseEntered(with event: NSEvent) {
-        if panEnabled { NSCursor.openHand.set() }
+        if isDragging {
+            NSCursor.closedHand.set()
+        } else if panEnabled {
+            NSCursor.openHand.set()
+        }
     }
 
     override func mouseExited(with event: NSEvent) {
-        NSCursor.arrow.set()
+        if !isDragging { NSCursor.arrow.set() }
     }
 
     override func mouseDown(with event: NSEvent) {
         guard panEnabled else { return }
+        isDragging = true
         NSCursor.closedHand.set()
         lastDragWindowPoint = event.locationInWindow
     }
@@ -71,6 +79,9 @@ final class CanvasNSView: NSView {
         guard panEnabled,
               let last = lastDragWindowPoint,
               let scroll = enclosingScrollView else { return }
+        // Keep closed-hand cursor pinned through the drag; tracking-area
+        // cursorUpdate runs constantly and would otherwise reset it to openHand.
+        NSCursor.closedHand.set()
         let current = event.locationInWindow
         let dx = current.x - last.x
         let dy = current.y - last.y
@@ -98,8 +109,10 @@ final class CanvasNSView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        isDragging = false
         lastDragWindowPoint = nil
-        if panEnabled, let win = window, NSPointInRect(win.mouseLocationOutsideOfEventStream, convert(bounds, to: nil)) {
+        if panEnabled, let win = window,
+           NSPointInRect(win.mouseLocationOutsideOfEventStream, convert(bounds, to: nil)) {
             NSCursor.openHand.set()
         } else {
             NSCursor.arrow.set()
@@ -135,6 +148,19 @@ final class CanvasNSView: NSView {
     }
 }
 
+final class CanvasScrollView: NSScrollView {
+    var onResize: (() -> Void)?
+    private var lastSize: NSSize = .zero
+
+    override func tile() {
+        super.tile()
+        if frame.size != lastSize {
+            lastSize = frame.size
+            onResize?()
+        }
+    }
+}
+
 struct ImageCanvasView: NSViewRepresentable {
     let image: NSImage
     @Binding var zoom: CGFloat
@@ -151,7 +177,7 @@ struct ImageCanvasView: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSScrollView()
+        let scroll = CanvasScrollView()
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
@@ -184,11 +210,7 @@ struct ImageCanvasView: NSViewRepresentable {
         }
 
         // Auto re-fit / re-center on viewport resize until user manually interacts.
-        context.coordinator.frameObserver = NotificationCenter.default.addObserver(
-            forName: NSView.frameDidChangeNotification,
-            object: scroll.contentView,
-            queue: .main
-        ) { [weak scroll] _ in
+        scroll.onResize = { [weak scroll] in
             guard let scroll = scroll else { return }
             if !context.coordinator.userInteracted {
                 applyInitialFit(scroll: scroll)
