@@ -119,6 +119,7 @@ struct HelpView: View {
                     t("Cmd+Shift+S = Save As cu panel."),
                     t("Daca inchizi tab-ul fara save, editarile se pastreaza intr-un autosave invisible (App Support); la reopen primesti prompt pentru a continua sau renunta.")
                 ])
+                xmpSection
                 section(title: t("Scurtaturi"), body: shortcutsList)
                 section(title: t("Sfaturi"), body: [
                     t("La Crop, intrarea in tool reduce zoom-ul cu 10% ca sa ai loc sa apuci colturile."),
@@ -181,6 +182,59 @@ struct HelpView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+        }
+    }
+
+    private var xmpSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(t("Formatul XMP"))
+                .font(.headline)
+            Text(t("Stiva de editari (EditStack) se serializeaza ca JSON intr-o proprietate XMP custom, incorporata in fisierul salvat. Photo2Mac o reciteste la deschidere; alte aplicatii vad doar pixelii randati."))
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(t("Namespace:")).foregroundStyle(.secondary)
+                    Text(verbatim: "http://ns.photo2mac.cremenescu.ro/1.0/")
+                        .font(.system(.callout, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(t("Prefix:")).foregroundStyle(.secondary)
+                    Text(verbatim: "p2m").font(.system(.callout, design: .monospaced))
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(t("Property:")).foregroundStyle(.secondary)
+                    Text(verbatim: "p2m:editStack").font(.system(.callout, design: .monospaced))
+                }
+            }
+            Text(t("Containere: JPEG (APP1), PNG (iTXt), HEIC (meta box), TIFF (tag 700). Se mai scriu si xmp:CreatorTool + tiff:ImageDescription + dc:description (rezumat in engleza), ca metadata sa fie vizibila in orice viewer (Preview, exiftool, Bridge, Get Info)."))
+                .fixedSize(horizontal: false, vertical: true)
+            Text(verbatim: """
+{
+  "rotateDegrees": -2.5,
+  "flipHorizontal": false,
+  "flipVertical": false,
+  "crop": { "x": 0.05, "y": 0.10,
+            "width": 0.90, "height": 0.80 },
+  "adjustments": {
+    "brightness": 0.12, "contrast": 0.05,
+    "saturation": 0,    "exposure": 0.30
+  }
+}
+""")
+                .font(.system(.callout, design: .monospaced))
+                .textSelection(.enabled)
+                .padding(8)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(6)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(t("Ordine de randare: flipH → flipV → rotate → crop → adjustments. Crop-ul lucreaza pe cadrul rotit/flipped, ajustarile pe regiunea decupata."))
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 14) {
+                Link(t("Documentatie completa (docs/XMP.md)"),
+                     destination: URL(string: "https://github.com/cremenescu/Photo2Mac/blob/main/docs/XMP.md")!)
+            }
+            .font(.callout)
         }
     }
 

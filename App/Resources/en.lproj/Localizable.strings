@@ -203,3 +203,13 @@
 "Scrierea fisierului a esuat la %@." = "Writing the file failed at %@.";
 "Salveaza imaginea" = "Save image";
 "Nume fisier:" = "File name:";
+
+/* Help — XMP section */
+"Formatul XMP" = "XMP format";
+"Namespace:" = "Namespace:";
+"Prefix:" = "Prefix:";
+"Property:" = "Property:";
+"Stiva de editari (EditStack) se serializeaza ca JSON intr-o proprietate XMP custom, incorporata in fisierul salvat. Photo2Mac o reciteste la deschidere; alte aplicatii vad doar pixelii randati." = "The edit stack (EditStack) is serialized as JSON into a custom XMP property embedded in the saved file. Photo2Mac reads it back on open; other apps just see the rendered pixels.";
+"Containere: JPEG (APP1), PNG (iTXt), HEIC (meta box), TIFF (tag 700). Se mai scriu si xmp:CreatorTool + tiff:ImageDescription + dc:description (rezumat in engleza), ca metadata sa fie vizibila in orice viewer (Preview, exiftool, Bridge, Get Info)." = "Containers: JPEG (APP1), PNG (iTXt), HEIC (meta box), TIFF (tag 700). Photo2Mac also writes xmp:CreatorTool + tiff:ImageDescription + dc:description (one-line English summary), so the metadata is visible in any viewer (Preview, exiftool, Bridge, Get Info).";
+"Ordine de randare: flipH → flipV → rotate → crop → adjustments. Crop-ul lucreaza pe cadrul rotit/flipped, ajustarile pe regiunea decupata." = "Render order: flipH → flipV → rotate → crop → adjustments. Crop operates on the rotated/flipped frame, adjustments on the cropped region.";
+"Documentatie completa (docs/XMP.md)" = "Full reference (docs/XMP.md)";
