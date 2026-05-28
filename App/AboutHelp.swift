@@ -76,15 +76,21 @@ final class HelpWindow {
             .environmentObject(LanguageManager.shared)
             .id(LanguageManager.shared.choice)
         let host = NSHostingController(rootView: content)
+        // NSHostingController shrinks the window to its content's intrinsic
+        // size on first display, which collapses to almost nothing while
+        // SwiftUI's ScrollView is still laying out. Pin the preferred size
+        // explicitly and bump initial frame so the help is readable on open.
+        host.preferredContentSize = NSSize(width: 740, height: 820)
         let w = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 620, height: 720),
+            contentRect: NSRect(x: 0, y: 0, width: 740, height: 820),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered, defer: false)
         w.title = t("Ajutor Photo2Mac")
         w.contentViewController = host
+        w.setContentSize(NSSize(width: 740, height: 820))
         w.center()
         w.isReleasedWhenClosed = false
-        w.minSize = NSSize(width: 480, height: 480)
+        w.minSize = NSSize(width: 560, height: 520)
         window = w
         w.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
