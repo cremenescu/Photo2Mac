@@ -158,6 +158,7 @@ struct Photo2MacApp: App {
             SaveCommands()
             PreferencesCommand()
             UndoRedoCommands()
+            AboutHelpCommands()
         }
 
         Window("Photo2Mac Settings", id: "preferences") {

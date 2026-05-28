@@ -119,6 +119,50 @@
 "Workspace gol" = "Workspace empty";
 "Trage o imagine aici, sau Cmd+O." = "Drop an image here, or press Cmd+O.";
 
+// MARK: - About / Help
+"Despre Photo2Mac" = "About Photo2Mac";
+"Ajutor Photo2Mac" = "Photo2Mac Help";
+"Vezi pe GitHub" = "View on GitHub";
+"Raporteaza o problema" = "Report an issue";
+"E-mail autor" = "Email the author";
+"Probleme" = "Issues";
+"Ajutor" = "Help";
+"Linkuri" = "Links";
+"Editor de imagini nativ macOS, model nedistructiv (XMP)." = "Native macOS image editor, non-destructive (XMP) model.";
+"Ce este Photo2Mac" = "What is Photo2Mac";
+"Photo2Mac este un editor de imagini nativ macOS, simplu si rapid. Modelul de editare este nedistructiv: pixelii originali nu se modifica decat la salvare; pana atunci, fiecare ajustare (decupare, rotire, flip, luminozitate, contrast, saturatie, expunere) e doar o instructiune in stiva de editari, randata live prin Core Image." = "Photo2Mac is a small, fast native macOS image editor. It's non-destructive: original pixels stay untouched until you save; until then, every adjustment (crop, rotate, flip, brightness, contrast, saturation, exposure) is just an instruction on the edit stack, rendered live through Core Image.";
+"Stiva de editari se salveaza in metadata XMP a fisierului — deschiderea aceluiasi fisier in Photo2Mac restaureaza editarile (le poti modifica). Alte aplicatii vad doar pixelii randati." = "The edit stack is saved into the file's XMP metadata — reopening the same file in Photo2Mac restores the edits (you can keep tweaking). Other apps just see the rendered pixels.";
+"Cum incepi" = "Getting started";
+"File → Open image... (Cmd+O), drag-and-drop pe fereastra, sau alege o imagine recenta din ecranul de pornire." = "File → Open image… (Cmd+O), drag-and-drop on the window, or pick a recent image from the welcome screen.";
+"Imaginile deschise apar ca tab-uri in partea de sus. Cmd+W inchide tab-ul curent, Cmd+Shift+W inchide fereastra (app-ul ramane viu)." = "Open images appear as tabs at the top. Cmd+W closes the current tab; Cmd+Shift+W closes the window (the app stays running).";
+"Tool-uri" = "Tools";
+"Mutare: mut imaginea in workspace (click-drag sau scroll trackpad)." = "Move: pans the image within the workspace (click-drag or trackpad scroll).";
+"Decupare: dreptunghi de selectie cu colt-handles + edge-handles. Picker pentru raport (Original, 1:1, 4:3, ..., Liber). Apply commit-uieste." = "Crop: selection rectangle with corner + edge handles. Aspect ratio picker (Original, 1:1, 4:3, ..., Free). Apply commits.";
+"Rotire: presets ±90°, slider 0.01° + text field pentru unghi precis, Flip H/V." = "Rotate: ±90° presets, 0.01° slider + text field for precise angle, Flip H/V.";
+"Ajustari: histograma live (Luminanta/RGB/R/G/B) + sliders pentru Luminozitate, Contrast, Saturatie, Expunere." = "Adjustments: live histogram (Luminance/RGB/R/G/B) + Brightness, Contrast, Saturation, Exposure sliders.";
+"Metadate: vezi EXIF (camera, ISO, expunere, etc.) si statusul XMP-ului Photo2Mac (JSON brut optional)." = "Metadata: shows EXIF (camera, ISO, shutter, etc.) and the Photo2Mac XMP status (raw JSON optional).";
+"Save / persistare" = "Saving / persistence";
+"Cmd+S scrie peste fisierul deschis: pixeli randati + stack EditStack ca XMP. macOS retine si o versiune anterioara prin NSFileVersion." = "Cmd+S overwrites the open file: rendered pixels + EditStack as XMP. macOS keeps a previous version via NSFileVersion.";
+"Cmd+Shift+S = Save As cu panel." = "Cmd+Shift+S = Save As with a panel.";
+"Daca inchizi tab-ul fara save, editarile se pastreaza intr-un autosave invisible (App Support); la reopen primesti prompt pentru a continua sau renunta." = "Close a tab without saving and your edits live on as an invisible autosave (App Support); reopening prompts to continue or discard.";
+"Scurtaturi" = "Shortcuts";
+"deschide imagine" = "open image";
+"salveaza peste fisier" = "save over file";
+"salveaza ca" = "save as";
+"inchide tab" = "close tab";
+"inchide fereastra" = "close window";
+"anuleaza ultima actiune" = "undo last action";
+"refa" = "redo";
+"preferinte" = "preferences";
+"Sfaturi" = "Tips";
+"La Crop, intrarea in tool reduce zoom-ul cu 10%% ca sa ai loc sa apuci colturile." = "Crop entry zooms out 10%% so the corner handles are easy to grab.";
+"La Tune/Rotate, sliderele coaleseaza intr-o singura actiune in stiva undo (Cmd+Z anuleaza intreg drag-ul, nu fiecare pixel)." = "Tune/Rotate sliders coalesce into a single undo step (Cmd+Z reverts the whole drag, not every pixel).";
+"Butonul Edits din toolbar arata lista de editari aplicate cu X per item pentru revert selectiv." = "The Edits toolbar button shows the applied edits with an X per row for selective revert.";
+"Limitari curente" = "Current limitations";
+"Faza 2 (urmatoare): anotari vector (text/sageata/dreptunghi/blur), batch processor, organize/browse, screenshot capture, RAW." = "Phase 2 (next): vector annotations (text/arrow/rectangle/blur), batch processor, organize/browse, screenshot capture, RAW.";
+"Aspect ratio Original = ratio-ul nativ al imaginii curente." = "'Original' aspect ratio = the current image's native ratio.";
+"CMYK histogram in pauza (cere ICC color management corect)." = "CMYK histogram on hold (needs proper ICC color management).";
+
 // MARK: - Empty inspector placeholders
 "Deschide o imagine pentru a ajusta." = "Open an image to adjust.";
 "Deschide o imagine pentru rotire." = "Open an image to rotate.";
