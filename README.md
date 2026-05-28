@@ -4,6 +4,12 @@ A native macOS image editor — simple, fast, **non-destructive**.
 
 > [In Romanian / In romana](README.ro.md)
 
+## Links
+
+- Landing page: <https://cremenescu.ro/photo2mac/>
+- Latest release `.dmg`: <https://github.com/cremenescu/Photo2Mac/releases/latest>
+- Issue tracker: <https://github.com/cremenescu/Photo2Mac/issues>
+
 ## Status
 
 In development — `v0.1.0-alpha` (phase 1: single-image editor).
