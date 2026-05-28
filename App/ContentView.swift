@@ -1324,37 +1324,39 @@ struct SettingsView: View {
         .padding()
     }
 
-    @State private var assocTick = 0  // bump to re-read defaults after a change
+    // Bumped by the bulk button to ask all rows to poll. NOT applied via
+    // `.id()` on the section — that would destroy child @State and kill
+    // each row's polling Task. Rows observe it via `.onChange`.
+    @State private var bulkRefreshNonce = 0
 
     private var fileAssociationsSection: some View {
         Section(t("Asociere tipuri de fisiere")) {
             ForEach(FileAssociations.supportedTypes) { type in
-                FileAssociationRow(type: type, tick: assocTick) {
-                    assocTick &+= 1
-                }
+                FileAssociationRow(type: type, bulkRefreshNonce: bulkRefreshNonce)
             }
             Button(t("Seteaza Photo2Mac default pentru toate cele de mai sus")) {
                 for type in FileAssociations.supportedTypes {
                     FileAssociations.makeUsDefault(for: type.id)
                 }
-                assocTick &+= 1
+                bulkRefreshNonce &+= 1
             }
             Text(t("macOS poate cere o singura confirmare la prima schimbare. Pentru a reveni la aplicatia anterioara, foloseste Finder > Get Info > Open With."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .id(assocTick)
     }
 }
 
 /// One row of the File Associations section. Keeps its own snapshot of the
-/// current default handler so a toggle change reflects immediately.
+/// current default handler. macOS shows a confirmation dialog ("Use
+/// Photo2Mac" vs "Keep Preview") asynchronously after our call, so the
+/// real outcome lands later — we poll for it.
 private struct FileAssociationRow: View {
     let type: FileAssociations.ImageType
-    let tick: Int                  // forces re-read when caller bumps it
-    let onChange: () -> Void
+    let bulkRefreshNonce: Int      // bump from parent = please poll
 
     @State private var currentBundleID: String? = nil
+    @State private var pollTask: Task<Void, Never>? = nil
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -1381,22 +1383,28 @@ private struct FileAssociationRow: View {
                 }
             }
             Spacer()
-            Toggle("", isOn: Binding(
-                get: { isOurs },
-                set: { newValue in
-                    if newValue {
-                        FileAssociations.makeUsDefault(for: type.id)
-                    } else {
-                        FileAssociations.setDefault(
-                            FileAssociations.fallbackBundleID, for: type.id)
-                    }
-                    onChange()
+            // Plain button row, NOT a SwiftUI Toggle. macOS shows its
+            // confirmation sheet asynchronously after our LS call and the
+            // user may reject the change — a toggle would visually flip
+            // before that decision lands, then mismatch reality. A button
+            // doesn't carry implied state.
+            if isOurs {
+                Button(t("Reseteaza")) {
+                    FileAssociations.setDefault(
+                        FileAssociations.fallbackBundleID, for: type.id)
+                    startPollingForChange()
                 }
-            ))
-            .labelsHidden()
+            } else {
+                Button(t("Seteaza default")) {
+                    FileAssociations.makeUsDefault(for: type.id)
+                    startPollingForChange()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
         }
         .onAppear { refresh() }
-        .onChange(of: tick) { _ in refresh() }
+        .onChange(of: bulkRefreshNonce) { _ in startPollingForChange() }
+        .onDisappear { pollTask?.cancel() }
     }
 
     private var isOurs: Bool {
@@ -1406,5 +1414,24 @@ private struct FileAssociationRow: View {
 
     private func refresh() {
         currentBundleID = FileAssociations.currentDefaultHandler(for: type.id)
+    }
+
+    /// macOS shows a "Use Photo2Mac / Keep Preview" sheet after our call.
+    /// `LSSetDefaultRoleHandlerForContentType` returns BEFORE that dialog
+    /// is shown, so reading the DB immediately gives the old value. We
+    /// poll for a few seconds; once a tick reports a stable value the
+    /// toggle reflects the real outcome (including when the user pressed
+    /// "Keep Preview" and we have to snap back).
+    private func startPollingForChange() {
+        pollTask?.cancel()
+        pollTask = Task { @MainActor in
+            // Delays in ms — short ones in case the user clicks fast,
+            // longer ones to cover slow taps; total window ~10 s.
+            for delayMs in [150, 250, 400, 700, 1100, 1800, 2500, 3500] {
+                try? await Task.sleep(nanoseconds: UInt64(delayMs) * 1_000_000)
+                if Task.isCancelled { return }
+                refresh()
+            }
+        }
     }
 }
