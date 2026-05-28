@@ -67,9 +67,20 @@ final class CanvasNSView: NSView {
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        if isDragging {
-            NSCursor.closedHand.set()
-        } else if panEnabled {
+        // Mid-drag: the cursor was selected at mouseDown and should stay.
+        if isDragging { return }
+
+        // In crop mode, show the handle-appropriate resize cursor when
+        // hovering over a handle or the interior. This wins over pan cursor.
+        if let crop = cropEditState {
+            let p = convert(event.locationInWindow, from: nil)
+            if let handle = cropHandleHitTest(at: p, crop: crop) {
+                cursorForCropHandle(handle).set()
+                return
+            }
+        }
+
+        if panEnabled {
             NSCursor.openHand.set()
         } else {
             NSCursor.arrow.set()
@@ -77,15 +88,24 @@ final class CanvasNSView: NSView {
     }
 
     override func mouseEntered(with event: NSEvent) {
-        if isDragging {
-            NSCursor.closedHand.set()
-        } else if panEnabled {
-            NSCursor.openHand.set()
-        }
+        cursorUpdate(with: event)
     }
 
     override func mouseExited(with event: NSEvent) {
         if !isDragging { NSCursor.arrow.set() }
+    }
+
+    /// Cursor for a crop handle. macOS 14 exposes resizeUpDown / resizeLeftRight
+    /// as public NSCursors; for diagonals (corners) we fall back to crosshair
+    /// since the diagonal-arrow cursors aren't in the public API on 14.
+    private func cursorForCropHandle(_ h: CropHandle) -> NSCursor {
+        switch h {
+        case .interior:        return NSCursor.openHand
+        case .topMid, .bottomMid:   return NSCursor.resizeUpDown
+        case .midLeft, .midRight:   return NSCursor.resizeLeftRight
+        case .topLeft, .topRight, .bottomLeft, .bottomRight:
+            return NSCursor.crosshair
+        }
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -96,7 +116,12 @@ final class CanvasNSView: NSView {
                 activeCropHandle = handle
                 dragStartCropRect = crop.rect
                 dragStartCanvasPoint = p
-                NSCursor.crosshair.set()
+                // Closed-hand for interior drag, directional resize for handles.
+                if handle == .interior {
+                    NSCursor.closedHand.set()
+                } else {
+                    cursorForCropHandle(handle).set()
+                }
                 isDragging = true
                 return
             }
