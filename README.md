@@ -9,6 +9,7 @@ A native macOS image editor — simple, fast, **non-destructive**.
 - Landing page: <https://cremenescu.ro/en/photo2mac/> (Romanian: <https://cremenescu.ro/ro/photo2mac/>)
 - Latest release `.dmg`: <https://github.com/cremenescu/Photo2Mac/releases/latest>
 - Issue tracker: <https://github.com/cremenescu/Photo2Mac/issues>
+- XMP edit-stack format: [`docs/XMP.md`](docs/XMP.md)
 
 ## Status
 
