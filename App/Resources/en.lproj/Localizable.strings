@@ -213,3 +213,11 @@
 "Containere: JPEG (APP1), PNG (iTXt), HEIC (meta box), TIFF (tag 700). Se mai scriu si xmp:CreatorTool + tiff:ImageDescription + dc:description (rezumat in engleza), ca metadata sa fie vizibila in orice viewer (Preview, exiftool, Bridge, Get Info)." = "Containers: JPEG (APP1), PNG (iTXt), HEIC (meta box), TIFF (tag 700). Photo2Mac also writes xmp:CreatorTool + tiff:ImageDescription + dc:description (one-line English summary), so the metadata is visible in any viewer (Preview, exiftool, Bridge, Get Info).";
 "Ordine de randare: flipH → flipV → rotate → crop → adjustments. Crop-ul lucreaza pe cadrul rotit/flipped, ajustarile pe regiunea decupata." = "Render order: flipH → flipV → rotate → crop → adjustments. Crop operates on the rotated/flipped frame, adjustments on the cropped region.";
 "Documentatie completa (docs/XMP.md)" = "Full reference (docs/XMP.md)";
+
+/* Settings — File associations */
+"Asociere tipuri de fisiere" = "File associations";
+"Default: %@" = "Default: %@";
+"Default: Photo2Mac" = "Default: Photo2Mac";
+"Default: (nesetat)" = "Default: (none)";
+"Seteaza Photo2Mac default pentru toate cele de mai sus" = "Set Photo2Mac as default for everything above";
+"macOS poate cere o singura confirmare la prima schimbare. Pentru a reveni la aplicatia anterioara, foloseste Finder > Get Info > Open With." = "macOS may prompt for confirmation the first time. To revert to the previous app, use Finder > Get Info > Open With.";

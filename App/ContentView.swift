@@ -1318,8 +1318,93 @@ struct SettingsView: View {
                     }
                 }
             }
+            fileAssociationsSection
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    @State private var assocTick = 0  // bump to re-read defaults after a change
+
+    private var fileAssociationsSection: some View {
+        Section(t("Asociere tipuri de fisiere")) {
+            ForEach(FileAssociations.supportedTypes) { type in
+                FileAssociationRow(type: type, tick: assocTick) {
+                    assocTick &+= 1
+                }
+            }
+            Button(t("Seteaza Photo2Mac default pentru toate cele de mai sus")) {
+                for type in FileAssociations.supportedTypes {
+                    FileAssociations.makeUsDefault(for: type.id)
+                }
+                assocTick &+= 1
+            }
+            Text(t("macOS poate cere o singura confirmare la prima schimbare. Pentru a reveni la aplicatia anterioara, foloseste Finder > Get Info > Open With."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .id(assocTick)
+    }
+}
+
+/// One row of the File Associations section. Keeps its own snapshot of the
+/// current default handler so a toggle change reflects immediately.
+private struct FileAssociationRow: View {
+    let type: FileAssociations.ImageType
+    let tick: Int                  // forces re-read when caller bumps it
+    let onChange: () -> Void
+
+    @State private var currentBundleID: String? = nil
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(type.label).fontWeight(.medium)
+                    Text(type.extensions)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let bid = currentBundleID, !isOurs {
+                    Text(t("Default: %@",
+                          FileAssociations.displayName(forBundleID: bid)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if isOurs {
+                    Text(t("Default: Photo2Mac"))
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                } else {
+                    Text(t("Default: (nesetat)"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Toggle("", isOn: Binding(
+                get: { isOurs },
+                set: { newValue in
+                    if newValue {
+                        FileAssociations.makeUsDefault(for: type.id)
+                    } else {
+                        FileAssociations.setDefault(
+                            FileAssociations.fallbackBundleID, for: type.id)
+                    }
+                    onChange()
+                }
+            ))
+            .labelsHidden()
+        }
+        .onAppear { refresh() }
+        .onChange(of: tick) { _ in refresh() }
+    }
+
+    private var isOurs: Bool {
+        currentBundleID?.lowercased()
+            == FileAssociations.ourBundleID.lowercased()
+    }
+
+    private func refresh() {
+        currentBundleID = FileAssociations.currentDefaultHandler(for: type.id)
     }
 }
