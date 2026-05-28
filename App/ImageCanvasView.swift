@@ -58,12 +58,31 @@ final class CanvasNSView: NSView {
         let ta = NSTrackingArea(
             rect: .zero,
             options: [.activeInKeyWindow, .mouseEnteredAndExited,
-                      .cursorUpdate, .inVisibleRect],
+                      .mouseMoved, .cursorUpdate, .inVisibleRect],
             owner: self,
             userInfo: nil
         )
         addTrackingArea(ta)
         trackingArea = ta
+    }
+
+    /// Movement within the tracking area: re-evaluate cursor so the user sees
+    /// the right shape (resize arrows, openHand, crosshair) as they hover
+    /// across handles, edges, and the interior of the crop rect.
+    override func mouseMoved(with event: NSEvent) {
+        if isDragging { return }
+        if let crop = cropEditState {
+            let p = convert(event.locationInWindow, from: nil)
+            if let handle = cropHandleHitTest(at: p, crop: crop) {
+                cursorForCropHandle(handle).set()
+                return
+            }
+        }
+        if panEnabled {
+            NSCursor.openHand.set()
+        } else {
+            NSCursor.arrow.set()
+        }
     }
 
     override func cursorUpdate(with event: NSEvent) {
@@ -96,16 +115,34 @@ final class CanvasNSView: NSView {
     }
 
     /// Cursor for a crop handle. macOS 14 exposes resizeUpDown / resizeLeftRight
-    /// as public NSCursors; for diagonals (corners) we fall back to crosshair
-    /// since the diagonal-arrow cursors aren't in the public API on 14.
+    /// as public NSCursors. The diagonal cursors aren't in the public API but
+    /// the AppKit class exposes them as private class methods that have been
+    /// stable for years — we resolve them via NSSelectorFromString and fall
+    /// back to crosshair if they're ever removed.
     private func cursorForCropHandle(_ h: CropHandle) -> NSCursor {
         switch h {
-        case .interior:        return NSCursor.openHand
-        case .topMid, .bottomMid:   return NSCursor.resizeUpDown
-        case .midLeft, .midRight:   return NSCursor.resizeLeftRight
-        case .topLeft, .topRight, .bottomLeft, .bottomRight:
-            return NSCursor.crosshair
+        case .interior:           return NSCursor.openHand
+        case .topMid, .bottomMid: return NSCursor.resizeUpDown
+        case .midLeft, .midRight: return NSCursor.resizeLeftRight
+        case .topLeft, .bottomRight:
+            return Self.diagonalCursorNWSE ?? NSCursor.crosshair
+        case .topRight, .bottomLeft:
+            return Self.diagonalCursorNESW ?? NSCursor.crosshair
         }
+    }
+
+    private static let diagonalCursorNWSE: NSCursor? =
+        privateCursor("_windowResizeNorthWestSouthEastCursor")
+    private static let diagonalCursorNESW: NSCursor? =
+        privateCursor("_windowResizeNorthEastSouthWestCursor")
+
+    private static func privateCursor(_ name: String) -> NSCursor? {
+        let sel = NSSelectorFromString(name)
+        let obj: AnyObject = NSCursor.self
+        guard obj.responds(to: sel) else { return nil }
+        // Call the (class) method via NSObject's perform on the metaclass.
+        let unmanaged: Unmanaged<AnyObject>? = obj.perform(sel)
+        return unmanaged?.takeUnretainedValue() as? NSCursor
     }
 
     override func mouseDown(with event: NSEvent) {
