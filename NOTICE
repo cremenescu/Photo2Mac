@@ -1,0 +1,15 @@
+Photo2Mac
+Copyright (c) 2026 Razvan Cremenescu
+
+This product is licensed under the GNU General Public License version 2 or
+(at your option) any later version. See LICENSE for the full text.
+
+This product includes or links to third-party software:
+
+================================================================================
+1. Phosphor icons (via Iconify)
+   Source: https://github.com/phosphor-icons/core
+   Copyright (c) Phosphor Icons
+   License: MIT License
+   A subset of SVG icons is bundled under App/Resources/Icons/.
+================================================================================
