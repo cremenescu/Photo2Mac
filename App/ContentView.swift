@@ -920,10 +920,13 @@ struct RotateInspector: View {
 
             // Fine rotation: -180 .. +180 in 0.01° steps.
             VStack(alignment: .leading, spacing: 2) {
-                HStack {
+                HStack(spacing: 6) {
                     Text(t("Unghi (°)"))
                         .font(.callout)
                     Spacer()
+                    HoldRepeatButton(systemImage: "chevron.left") { step in
+                        nudgeAngle(by: -step)
+                    }
                     TextField("", value: Binding(
                         get: { doc.stack.rotateDegrees },
                         set: { newValue in
@@ -931,8 +934,12 @@ struct RotateInspector: View {
                         }
                     ), formatter: Self.formatter)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 70)
+                    .frame(width: 64)
                     .monospacedDigit()
+                    .multilineTextAlignment(.center)
+                    HoldRepeatButton(systemImage: "chevron.right") { step in
+                        nudgeAngle(by: step)
+                    }
                 }
                 Slider(value: Binding(
                     get: { doc.stack.rotateDegrees },
@@ -1053,6 +1060,86 @@ struct RotateInspector: View {
         while r > 180 { r -= 360 }
         while r <= -180 { r += 360 }
         doc.stack.rotateDegrees = r
+    }
+
+    /// Incremental nudge from the stepper arrows. Clamps to [-180, 180]
+    /// (no wrap-around — for straightening you don't want -180 to jump to
+    /// +180). Rounds to 0.01° to keep the field clean.
+    private func nudgeAngle(by delta: Double) {
+        let r = max(-180, min(180, doc.stack.rotateDegrees + delta))
+        doc.stack.rotateDegrees = (r * 100).rounded() / 100
+    }
+}
+
+/// A small arrow button that fires once on tap and, when held, repeats with
+/// gradual acceleration — slow at first, then faster (capped so it never runs
+/// away). The closure receives the step magnitude to apply for each tick.
+struct HoldRepeatButton: View {
+    let systemImage: String
+    let onStep: (Double) -> Void
+
+    @State private var holding = false
+    @State private var tick = 0
+    @State private var hovering = false
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 11, weight: .semibold))
+            .frame(width: 22, height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(holding ? Color.accentColor.opacity(0.25)
+                          : (hovering ? Color.secondary.opacity(0.18)
+                             : Color.secondary.opacity(0.10)))
+            )
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        if !holding { startHolding() }
+                    }
+                    .onEnded { _ in stopHolding() }
+            )
+            .accessibilityLabel(systemImage.contains("left")
+                                ? t("Scade unghiul") : t("Creste unghiul"))
+    }
+
+    private func startHolding() {
+        holding = true
+        tick = 0
+        onStep(stepAmount())   // immediate feedback on press
+        tick += 1
+        scheduleNext()
+    }
+
+    private func stopHolding() {
+        holding = false
+    }
+
+    private func scheduleNext() {
+        let interval = currentInterval()
+        DispatchQueue.main.asyncAfter(deadline: .now() + interval) {
+            guard holding else { return }
+            onStep(stepAmount())
+            tick += 1
+            scheduleNext()
+        }
+    }
+
+    /// Fire rate accelerates with hold duration but floors so it stays usable.
+    private func currentInterval() -> Double {
+        // 0.32s at first, easing down to a 0.06s floor.
+        max(0.06, 0.32 - Double(tick) * 0.03)
+    }
+
+    /// Step magnitude grows the longer you hold: fine taps, then coarse sweep.
+    private func stepAmount() -> Double {
+        switch tick {
+        case 0..<8:   return 0.1   // first ~2s: precise
+        case 8..<22:  return 0.5
+        default:      return 1.0   // sustained hold: faster, but capped
+        }
     }
 }
 

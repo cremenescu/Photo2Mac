@@ -229,22 +229,33 @@ final class CanvasNSView: NSView {
         )
         imageDrawRect = rect
 
+        // Draw the image with a drop shadow cast by its own (possibly rotated)
+        // silhouette. We must NOT fill a white rectangle behind it: when the
+        // image is rotated by a free angle its bounding box has transparent
+        // corners, and a white backing would show through as white triangles.
+        // Applying the shadow to the image draw makes the shadow follow the
+        // real, tilted shape and leaves the corners transparent (canvas shows
+        // through).
         if let ctx = NSGraphicsContext.current?.cgContext {
             ctx.saveGState()
             ctx.setShadow(offset: CGSize(width: 0, height: -3),
                           blur: 12,
                           color: NSColor.black.withAlphaComponent(0.45).cgColor)
-            NSColor.white.setFill()
-            rect.fill()
+            img.draw(in: rect,
+                     from: .zero,
+                     operation: .sourceOver,
+                     fraction: 1.0,
+                     respectFlipped: true,
+                     hints: [.interpolation: NSImageInterpolation.high.rawValue])
             ctx.restoreGState()
+        } else {
+            img.draw(in: rect,
+                     from: .zero,
+                     operation: .sourceOver,
+                     fraction: 1.0,
+                     respectFlipped: true,
+                     hints: [.interpolation: NSImageInterpolation.high.rawValue])
         }
-
-        img.draw(in: rect,
-                 from: .zero,
-                 operation: .sourceOver,
-                 fraction: 1.0,
-                 respectFlipped: true,
-                 hints: [.interpolation: NSImageInterpolation.high.rawValue])
 
         if let crop = cropEditState {
             drawCropOverlay(crop: crop, in: rect)

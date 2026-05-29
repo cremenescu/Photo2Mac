@@ -223,3 +223,5 @@
 "macOS poate cere o singura confirmare la prima schimbare. Pentru a reveni la aplicatia anterioara, foloseste Finder > Get Info > Open With." = "macOS may prompt for confirmation the first time. To revert to the previous app, use Finder > Get Info > Open With.";
 "Seteaza default" = "Set as default";
 "Reseteaza" = "Reset";
+"Scade unghiul" = "Decrease angle";
+"Creste unghiul" = "Increase angle";
