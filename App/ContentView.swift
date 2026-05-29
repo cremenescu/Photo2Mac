@@ -63,7 +63,7 @@ struct WorkspaceView: View {
                 .layoutPriority(1)
 
                 if showInspector {
-                    InspectorView(tool: $tool, cropHolder: cropEdit)
+                    InspectorView(tool: $tool, cropHolder: cropEdit, zoom: $zoom)
                         .frame(minWidth: 200, idealWidth: 260, maxWidth: 360)
                 }
             }
@@ -536,6 +536,7 @@ struct InspectorView: View {
     @EnvironmentObject var workspace: Workspace
     @Binding var tool: EditorTool
     let cropHolder: CropEditHolder
+    @Binding var zoom: CGFloat
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -560,7 +561,7 @@ struct InspectorView: View {
                     }
                 case .rotate:
                     if let doc = workspace.selected {
-                        RotateInspector(doc: doc, tool: $tool)
+                        RotateInspector(doc: doc, tool: $tool, zoom: $zoom)
                     } else {
                         Text(t("Deschide o imagine pentru rotire."))
                             .foregroundStyle(.secondary)
@@ -892,6 +893,7 @@ struct CropInspector: View {
 struct RotateInspector: View {
     @ObservedObject var doc: OpenImage
     @Binding var tool: EditorTool
+    @Binding var zoom: CGFloat
     @State private var preToolSnap: EditStack?
 
     private static let formatter: NumberFormatter = {
@@ -1032,9 +1034,44 @@ struct RotateInspector: View {
                       && !doc.stack.flipHorizontal
                       && !doc.stack.flipVertical)
             .padding(.top, 4)
+
+            Divider().padding(.vertical, 4)
+
+            // Pinch-zoom is disabled while rotating (it competes with the
+            // trackpad rotate gesture), so offer an explicit zoom slider here.
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(t("Zoom"))
+                        .font(.callout)
+                    Spacer()
+                    Text(verbatim: String(format: "%d%%", Int((zoom * 100).rounded())))
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 6) {
+                    Button {
+                        zoom = max(0.05, (zoom / 1.25 * 100).rounded() / 100)
+                    } label: {
+                        Image(systemName: "minus.magnifyingglass")
+                    }
+                    .buttonStyle(.borderless)
+                    Slider(value: Binding(
+                        get: { Double(zoom) },
+                        set: { zoom = CGFloat($0) }
+                    ), in: 0.05...16)
+                    Button {
+                        zoom = min(16, (zoom * 1.25 * 100).rounded() / 100)
+                    } label: {
+                        Image(systemName: "plus.magnifyingglass")
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
         }
         .onAppear {
             if preToolSnap == nil { preToolSnap = doc.stack }
+            doc.prewarmRotation()   // make the first trackpad-rotate frame snappy
         }
         .onDisappear {
             if let snap = preToolSnap, snap != doc.stack {

@@ -65,6 +65,20 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
         AutosaveStore.shared.save(stack, for: url)
     }
 
+    /// Warm the Core Image / Metal rotation pipeline so the FIRST frame of a
+    /// trackpad rotate gesture isn't slow (shader compile + texture upload).
+    /// Called when entering the Rotate tool. Renders a throwaway frame with a
+    /// tiny rotation off the main thread and discards it.
+    func prewarmRotation() {
+        let original = originalImage
+        let ci = sourceCIImage
+        var s = stack
+        s.rotateDegrees += 0.01   // force the rotate branch through the GPU
+        renderQueue.async {
+            _ = ImageRenderer.render(original: original, sourceCI: ci, stack: s)
+        }
+    }
+
     /// Render off the main thread; cancels in-flight on next tick.
     func rerender() {
         pendingRender?.cancel()
@@ -256,6 +270,8 @@ final class Workspace: ObservableObject {
     func flushAllAutosaves() {
         for doc in documents { doc.flushAutosaveNow() }
     }
+
+    // (prewarm lives on OpenImage)
 
     private func supportedTypes() -> [UTType] {
         var types: [UTType] = [.jpeg, .png, .heic, .heif, .tiff, .webP]
