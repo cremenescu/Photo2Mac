@@ -20,7 +20,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        false
+        // Closing the (only) main window quits the app — the red X and
+        // closing the last tab both end up here. Settings/Help are
+        // auxiliary; closing one of those alone won't quit while the main
+        // window is still open.
+        true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Persist the last edit synchronously — the 500ms autosave debounce
+        // may not have fired if the user just quit by closing the window.
+        WorkspaceHolder.shared.workspace.flushAllAutosaves()
+    }
+
+    /// Close the main editor window (title "Photo2Mac"), not Settings/Help.
+    /// With terminateAfterLastWindowClosed this quits the app when it's the
+    /// only remaining window.
+    static func closeMainWindow() {
+        let main = NSApp.windows.first { $0.title == "Photo2Mac" }
+            ?? NSApp.keyWindow
+        main?.close()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -146,12 +165,18 @@ struct Photo2MacApp: App {
             CommandGroup(after: .newItem) {
                 Divider()
                 Button(t("Inchide tab")) {
-                    WorkspaceHolder.shared.workspace.closeSelected()
+                    let ws = WorkspaceHolder.shared.workspace
+                    ws.closeSelected()
+                    // Browser-style: closing the last tab closes the window,
+                    // which quits the app (terminateAfterLastWindowClosed).
+                    if ws.documents.isEmpty {
+                        AppDelegate.closeMainWindow()
+                    }
                 }
                 .keyboardShortcut("w", modifiers: [.command])
 
                 Button(t("Inchide fereastra")) {
-                    NSApp.keyWindow?.close()
+                    AppDelegate.closeMainWindow()
                 }
                 .keyboardShortcut("w", modifiers: [.command, .shift])
             }

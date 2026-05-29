@@ -57,6 +57,14 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
         AutosaveStore.shared.clear(for: url)
     }
 
+    /// Write the current stack to disk right now, synchronously, bypassing
+    /// the 500ms debounce. Used on app quit so the last edit isn't lost
+    /// when closing the window terminates the app.
+    func flushAutosaveNow() {
+        pendingAutosave?.cancel()
+        AutosaveStore.shared.save(stack, for: url)
+    }
+
     /// Render off the main thread; cancels in-flight on next tick.
     func rerender() {
         pendingRender?.cancel()
@@ -241,6 +249,12 @@ final class Workspace: ObservableObject {
                 selectedID = documents[min(idx, documents.count - 1)].id
             }
         }
+    }
+
+    /// Flush every open document's pending autosave synchronously. Called
+    /// on app termination.
+    func flushAllAutosaves() {
+        for doc in documents { doc.flushAutosaveNow() }
     }
 
     private func supportedTypes() -> [UTType] {
