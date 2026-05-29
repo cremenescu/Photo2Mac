@@ -1071,7 +1071,6 @@ struct RotateInspector: View {
         }
         .onAppear {
             if preToolSnap == nil { preToolSnap = doc.stack }
-            doc.prewarmRotation()   // make the first trackpad-rotate frame snappy
         }
         .onDisappear {
             if let snap = preToolSnap, snap != doc.stack {

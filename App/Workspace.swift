@@ -65,19 +65,6 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
         AutosaveStore.shared.save(stack, for: url)
     }
 
-    /// Warm the Core Image / Metal rotation pipeline so the FIRST frame of a
-    /// trackpad rotate gesture isn't slow (shader compile + texture upload).
-    /// Called when entering the Rotate tool. Renders a throwaway frame with a
-    /// tiny rotation off the main thread and discards it.
-    func prewarmRotation() {
-        let original = originalImage
-        let ci = sourceCIImage
-        var s = stack
-        s.rotateDegrees += 0.01   // force the rotate branch through the GPU
-        renderQueue.async {
-            _ = ImageRenderer.render(original: original, sourceCI: ci, stack: s)
-        }
-    }
 
     /// Render off the main thread; cancels in-flight on next tick.
     func rerender() {
@@ -85,8 +72,16 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
         let stackSnapshot = stack
         let original = originalImage
         let ci = sourceCIImage
-        let work = DispatchWorkItem { [weak self] in
+        var work: DispatchWorkItem!
+        work = DispatchWorkItem { [weak self] in
+            // Drop stale frames: when a gesture (trackpad rotate, accelerating
+            // stepper arrows, slider drag) fires faster than we can render, the
+            // serial queue would otherwise render EVERY intermediate angle and
+            // fall behind. Each rerender() cancels the previous pending item, so
+            // bailing on isCancelled means only the latest queued frame renders.
+            if work.isCancelled { return }
             let rendered = ImageRenderer.render(original: original, sourceCI: ci, stack: stackSnapshot)
+            if work.isCancelled { return }
             DispatchQueue.main.async {
                 guard let self else { return }
                 if self.stack == stackSnapshot {
