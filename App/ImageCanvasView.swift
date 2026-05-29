@@ -584,7 +584,10 @@ struct ImageCanvasView: NSViewRepresentable {
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = true
         scroll.autohidesScrollers = true
-        scroll.allowsMagnification = true
+        // Pinch-zoom competes physically with the two-finger rotate gesture
+        // (fingers that rotate also pinch slightly), so turn magnification off
+        // while the Rotate tool is active. Re-enabled in updateNSView.
+        scroll.allowsMagnification = (tool != .rotate)
         scroll.minMagnification = 0.02
         scroll.maxMagnification = 32
         scroll.backgroundColor = NSColor(white: 0.12, alpha: 1.0)
@@ -642,6 +645,11 @@ struct ImageCanvasView: NSViewRepresentable {
         canvas.panEnabled = (tool == .hand)
         canvas.rotationEnabled = (tool == .rotate)
         canvas.onRotate = onRotate
+        // Keep pinch-zoom out of the way of the rotate gesture.
+        let wantMagnify = (tool != .rotate)
+        if scroll.allowsMagnification != wantMagnify {
+            scroll.allowsMagnification = wantMagnify
+        }
         if canvas.cropEditState !== cropEditState {
             canvas.cropEditState = cropEditState
         }
