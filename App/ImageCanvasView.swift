@@ -48,6 +48,26 @@ final class CanvasNSView: NSView {
 
     var onUserInteract: (() -> Void)?
 
+    /// True only while the Rotate tool is active. Gates the two-finger
+    /// trackpad rotation gesture so it never fires in other tools.
+    var rotationEnabled: Bool = false
+    /// Reports an incremental rotation delta (clockwise-positive degrees)
+    /// from the trackpad rotate gesture.
+    var onRotate: ((CGFloat) -> Void)?
+
+    /// Two-finger trackpad rotate. `event.rotation` is the per-event delta in
+    /// degrees, positive = counterclockwise (AppKit). Our model angle is
+    /// clockwise-positive, so we negate. Only active in the Rotate tool;
+    /// otherwise forward so we don't swallow the gesture.
+    override func rotate(with event: NSEvent) {
+        guard rotationEnabled, let onRotate = onRotate else {
+            super.rotate(with: event)
+            return
+        }
+        onUserInteract?()
+        onRotate(-CGFloat(event.rotation))
+    }
+
     private var trackingArea: NSTrackingArea?
     private var lastDragWindowPoint: NSPoint?
     private var isDragging = false
@@ -545,6 +565,9 @@ struct ImageCanvasView: NSViewRepresentable {
     let alwaysRefitOnResize: Bool
     /// Active crop editing state, or nil if not in crop mode.
     let cropEditState: CropEditState?
+    /// Called with an incremental clockwise-positive degree delta from the
+    /// trackpad two-finger rotate gesture (only while the Rotate tool is on).
+    var onRotate: ((CGFloat) -> Void)? = nil
 
     final class Coordinator {
         var fittedDocumentID: UUID?
@@ -577,6 +600,8 @@ struct ImageCanvasView: NSViewRepresentable {
         let canvas = CanvasNSView()
         canvas.image = image
         canvas.panEnabled = (tool == .hand)
+        canvas.rotationEnabled = (tool == .rotate)
+        canvas.onRotate = onRotate
         canvas.cropEditState = cropEditState
         let cFrame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
         canvas.frame = cFrame
@@ -615,6 +640,8 @@ struct ImageCanvasView: NSViewRepresentable {
         guard let canvas = scroll.documentView as? CanvasNSView else { return }
 
         canvas.panEnabled = (tool == .hand)
+        canvas.rotationEnabled = (tool == .rotate)
+        canvas.onRotate = onRotate
         if canvas.cropEditState !== cropEditState {
             canvas.cropEditState = cropEditState
         }

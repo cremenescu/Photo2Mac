@@ -286,7 +286,14 @@ struct CanvasContainer: View {
                         viewportSize: viewportSize,
                         forceFitNonce: forceFitNonce,
                         alwaysRefitOnResize: alwaysRefitOnResize,
-                        cropEditState: cropEditState)
+                        cropEditState: cropEditState,
+                        onRotate: { delta in
+                            // Trackpad rotate (Rotate tool only): accumulate
+                            // into the live angle, clamped, rounded to 0.01°.
+                            let r = max(-180, min(180,
+                                doc.stack.rotateDegrees + Double(delta)))
+                            doc.stack.rotateDegrees = (r * 100).rounded() / 100
+                        })
     }
 }
 
@@ -947,6 +954,9 @@ struct RotateInspector: View {
                         doc.stack.rotateDegrees = (v * 100).rounded() / 100
                     }
                 ), in: -180...180)
+                Text(t("Sau roteste cu doua degete pe trackpad."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             HStack(spacing: 8) {
