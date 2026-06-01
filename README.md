@@ -21,6 +21,18 @@ exposure) lives on an `EditStack` that is rendered live by Core Image
 and persisted into the XMP metadata of the saved file. Re-opening the
 same file in Photo2Mac restores the stack so you can keep editing.
 
+## Screenshots
+
+![Tune — brightness / contrast / saturation / exposure with a live histogram](docs/screenshots/tune.png)
+
+![Crop — 8 handles, rule-of-thirds grid and an aspect-ratio picker](docs/screenshots/crop.png)
+
+![Rotate — presets, a precise angle field with stepper arrows, two-finger trackpad rotation and a zoom slider](docs/screenshots/rotate.png)
+
+![Welcome screen — recent files and drag-and-drop](docs/screenshots/welcome.png)
+
+<sub>Sample image is a synthetic gradient generated for the screenshots — not a real photo.</sub>
+
 ## Features in the alpha
 
 - **Non-destructive editing** with a live Core Image pipeline (Metal-
