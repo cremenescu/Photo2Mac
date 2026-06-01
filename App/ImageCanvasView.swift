@@ -48,24 +48,61 @@ final class CanvasNSView: NSView {
 
     var onUserInteract: (() -> Void)?
 
-    /// True only while the Rotate tool is active. Gates the two-finger
-    /// trackpad rotation gesture so it never fires in other tools.
-    var rotationEnabled: Bool = false
-    /// Reports an incremental rotation delta (clockwise-positive degrees)
-    /// from the trackpad rotate gesture.
-    var onRotate: ((CGFloat) -> Void)?
+    /// Commits the in-progress rotation (clockwise-positive degrees) to the
+    /// model — called ONCE when the gesture ends, so Core Image renders only
+    /// the final angle, not every intermediate frame.
+    var onRotateCommit: ((CGFloat) -> Void)?
 
-    /// Two-finger trackpad rotate. `event.rotation` is the per-event delta in
-    /// degrees, positive = counterclockwise (AppKit). Our model angle is
-    /// clockwise-positive, so we negate. Only active in the Rotate tool;
-    /// otherwise forward so we don't swallow the gesture.
-    override func rotate(with event: NSEvent) {
-        guard rotationEnabled, let onRotate = onRotate else {
-            super.rotate(with: event)
-            return
+    /// In-progress trackpad rotation (clockwise-positive degrees), applied as
+    /// a cheap context transform in draw() for a fluid live preview. Reset to
+    /// 0 once committed.
+    private var liveRotateDegrees: CGFloat = 0
+
+    private weak var rotationRecognizer: NSRotationGestureRecognizer?
+
+    /// Enable/disable the trackpad rotate gesture (only on in the Rotate tool).
+    var rotationEnabled: Bool = false {
+        didSet {
+            if rotationRecognizer == nil { installRotationGesture() }
+            rotationRecognizer?.isEnabled = rotationEnabled
         }
-        onUserInteract?()
-        onRotate(-CGFloat(event.rotation))
+    }
+
+    private func installRotationGesture() {
+        let r = NSRotationGestureRecognizer(target: self,
+                                            action: #selector(handleRotation(_:)))
+        r.isEnabled = rotationEnabled
+        addGestureRecognizer(r)
+        rotationRecognizer = r
+    }
+
+    /// Idiomatic AppKit two-finger rotate. The recognizer reports `rotation`
+    /// as the ABSOLUTE angle (radians) accumulated since the gesture began,
+    /// positive = counterclockwise. Our model angle is clockwise-positive, so
+    /// `liveRotateDegrees = -rotation°`. We only redraw (cheap context
+    /// transform, no Core Image) during the gesture and commit the final angle
+    /// once on .ended — so preview and committed render use the SAME value and
+    /// can't disagree.
+    @objc private func handleRotation(_ g: NSRotationGestureRecognizer) {
+        let deg = -CGFloat(g.rotation) * 180.0 / .pi   // CW-positive degrees
+        switch g.state {
+        case .began:
+            onUserInteract?()
+            liveRotateDegrees = deg
+            needsDisplay = true
+        case .changed:
+            liveRotateDegrees = deg
+            needsDisplay = true
+        case .ended:
+            liveRotateDegrees = 0
+            needsDisplay = true
+            if abs(deg) > 0.0001 { onRotateCommit?(deg) }
+        case .cancelled, .failed:
+            liveRotateDegrees = 0
+            needsDisplay = true
+        default:
+            break
+        }
     }
 
     private var trackingArea: NSTrackingArea?
@@ -258,6 +295,21 @@ final class CanvasNSView: NSView {
         // through).
         if let ctx = NSGraphicsContext.current?.cgContext {
             ctx.saveGState()
+            // Live trackpad-rotate preview: rotate the drawing context around
+            // the image center by the in-progress delta. This is a cheap GPU
+            // transform — no Core Image re-render per frame — so the gesture
+            // stays fluid. The real EditStack render happens once on gesture
+            // end. (Corners may clip transiently for big angles; fine for a
+            // preview.)
+            if abs(liveRotateDegrees) > 0.0001 {
+                // This view is flipped (y-down), so a positive CGContext
+                // rotation appears clockwise on screen — matching the Core
+                // Image renderer's clockwise-positive convention. So preview
+                // and final render rotate the same way for the same value.
+                ctx.translateBy(x: rect.midX, y: rect.midY)
+                ctx.rotate(by: liveRotateDegrees * .pi / 180.0)
+                ctx.translateBy(x: -rect.midX, y: -rect.midY)
+            }
             ctx.setShadow(offset: CGSize(width: 0, height: -3),
                           blur: 12,
                           color: NSColor.black.withAlphaComponent(0.45).cgColor)
@@ -604,7 +656,7 @@ struct ImageCanvasView: NSViewRepresentable {
         canvas.image = image
         canvas.panEnabled = (tool == .hand)
         canvas.rotationEnabled = (tool == .rotate)
-        canvas.onRotate = onRotate
+        canvas.onRotateCommit = onRotate
         canvas.cropEditState = cropEditState
         let cFrame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
         canvas.frame = cFrame
@@ -644,7 +696,7 @@ struct ImageCanvasView: NSViewRepresentable {
 
         canvas.panEnabled = (tool == .hand)
         canvas.rotationEnabled = (tool == .rotate)
-        canvas.onRotate = onRotate
+        canvas.onRotateCommit = onRotate
         // Keep pinch-zoom out of the way of the rotate gesture.
         let wantMagnify = (tool != .rotate)
         if scroll.allowsMagnification != wantMagnify {
