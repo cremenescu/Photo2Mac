@@ -226,3 +226,4 @@
 "Scade unghiul" = "Decrease angle";
 "Creste unghiul" = "Increase angle";
 "Sau roteste cu doua degete pe trackpad." = "Or rotate with two fingers on the trackpad.";
+"Photo2Mac nu poate scrie formatul %@. Foloseste Salveaza ca... si alege JPEG, PNG, HEIC sau TIFF." = "Photo2Mac cannot write %@ files. Use Save As... and pick JPEG, PNG, HEIC or TIFF.";

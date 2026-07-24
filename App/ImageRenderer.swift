@@ -69,7 +69,16 @@ public enum ImageRenderer {
             ci = applyAdjustments(adj, to: ci)
         }
 
-        guard let cg = sharedContext.createCGImage(ci, from: ci.extent) else { return original }
+        // Render into the SOURCE's colour space. Without this, createCGImage
+        // falls back to DeviceRGB and a Display P3 or Adobe RGB photo loses its
+        // gamut on the first edit — measured: P3 [254,0,0] came out [233,51,35].
+        let outSpace = ciIn.colorSpace
+            ?? CGColorSpace(name: CGColorSpace.sRGB)
+        guard let cg = sharedContext.createCGImage(
+            ci, from: ci.extent,
+            format: .RGBA8,
+            colorSpace: outSpace
+        ) else { return original }
         return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
     }
 

@@ -36,6 +36,12 @@ enum SaveService {
     /// On success, clears the autosave (file is the source of truth now).
     @discardableResult
     static func write(doc: OpenImage, to url: URL) -> URL? {
+        guard let uti = XMPStack.utiType(for: url) else {
+            NSAlert.fail(t("Photo2Mac nu poate scrie formatul %@. Foloseste Salveaza ca... si alege JPEG, PNG, HEIC sau TIFF.",
+                            url.pathExtension.uppercased()))
+                .runModal()
+            return nil
+        }
         let rendered = ImageRenderer.render(
             original: doc.originalImage,
             sourceCI: doc.sourceCIImage,
@@ -43,14 +49,14 @@ enum SaveService {
         guard let cg = rendered.cgImage(
             forProposedRect: nil, context: nil, hints: nil)
         else {
-            NSAlert.fail("Nu am putut randa imaginea.").runModal()
+            NSAlert.fail(t("Nu am putut randa imaginea.")).runModal()
             return nil
         }
-        let uti = XMPStack.utiType(for: url)
         let ok = XMPStack.write(
-            stack: doc.stack, image: cg, to: url, utiType: uti)
+            stack: doc.stack, image: cg, to: url, utiType: uti,
+            sourceURL: doc.url)
         if !ok {
-            NSAlert.fail("Scrierea fisierului a esuat la \(url.lastPathComponent).")
+            NSAlert.fail(t("Scrierea fisierului a esuat la %@.", url.lastPathComponent))
                 .runModal()
             return nil
         }
