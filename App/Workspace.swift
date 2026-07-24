@@ -266,8 +266,6 @@ final class Workspace: ObservableObject {
         for doc in documents { doc.flushAutosaveNow() }
     }
 
-    // (prewarm lives on OpenImage)
-
     private func supportedTypes() -> [UTType] {
         var types: [UTType] = [.jpeg, .png, .heic, .heif, .tiff, .webP]
         if let avif = UTType("public.avif") { types.append(avif) }
