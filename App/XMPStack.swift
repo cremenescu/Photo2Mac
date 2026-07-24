@@ -73,9 +73,12 @@ enum XMPStack {
             return false
         }
 
-        // Start from the source's own metadata so foreign XMP (Lightroom,
-        // Capture One, IPTC rights) survives, then layer ours on top.
+        // Read EVERYTHING from the source before opening the destination: when
+        // saving in place the two are the same file, and reading it after
+        // ImageIO has taken it for writing is asking for trouble.
         let md = copyOfSourceMetadata(sourceURL) ?? CGImageMetadataCreateMutable()
+        var options = sourceProperties(sourceURL)
+        options[kCGImageDestinationLossyCompressionQuality] = jpegQuality
 
         // p2m: our custom edit-stack JSON (for re-edit roundtrip).
         CGImageMetadataRegisterNamespaceForPrefix(
@@ -100,8 +103,6 @@ enum XMPStack {
         guard let dest = CGImageDestinationCreateWithURL(
             url as CFURL, utiType, 1, nil
         ) else { return false }
-        var options = sourceProperties(sourceURL)
-        options[kCGImageDestinationLossyCompressionQuality] = jpegQuality
         CGImageDestinationAddImageAndMetadata(dest, image, md, options as CFDictionary)
         return CGImageDestinationFinalize(dest)
     }

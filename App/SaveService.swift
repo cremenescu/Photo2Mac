@@ -66,14 +66,18 @@ enum SaveService {
             return nil
         }
 
-        // What goes in the XMP depends on the mode, and the file records which
-        // mode wrote it so reopening cannot misread it.
+        // We are writing real pixels here. In sidecar mode that only happens via
+        // Save As (a different URL), and the result is a flattened file — record
+        // it as such, not as a sidecar file that has no sidecar.
+        let effectiveMode: SaveMode = (mode == .sidecar) ? .flattened : mode
+
+        // The file records which mode wrote it so reopening cannot misread it.
         var extraTags: [String: String] = [
-            SavedState.modeProperty: mode.rawValue
+            SavedState.modeProperty: effectiveMode.rawValue
         ]
         // The stack is written for provenance in every mode; only mode C marks
         // it as re-applicable, by shipping the original alongside it.
-        if mode == .embeddedOriginal {
+        if effectiveMode == .embeddedOriginal {
             guard let originalBytes = doc.pristineOriginalData() else {
                 NSAlert.fail(t("Nu am putut citi imaginea originala pentru a o pastra in fisier."))
                     .runModal()
@@ -94,7 +98,7 @@ enum SaveService {
             return nil
         }
         // A stale sidecar next to a now-flattened file would re-apply the edits.
-        if mode != .sidecar { SidecarStore.clear(for: url) }
+        SidecarStore.clear(for: url)
         AutosaveStore.shared.clear(for: doc.url)
         return url
     }
