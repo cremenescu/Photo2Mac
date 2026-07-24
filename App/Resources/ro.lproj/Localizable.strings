@@ -208,3 +208,17 @@
 "Creste unghiul" = "Creste unghiul";
 "Sau roteste cu doua degete pe trackpad." = "Sau roteste cu doua degete pe trackpad.";
 "Photo2Mac nu poate scrie formatul %@. Foloseste Salveaza ca... si alege JPEG, PNG, HEIC sau TIFF." = "Photo2Mac nu poate scrie formatul %@. Foloseste Salveaza ca... si alege JPEG, PNG, HEIC sau TIFF.";
+
+/* Save modes */
+"Salvare" = "Salvare";
+"Cand salvezi peste fisier (Cmd+S)" = "Cand salvezi peste fisier (Cmd+S)";
+"Salveaza ce vezi" = "Salveaza ce vezi";
+"Nu modifica originalul" = "Nu modifica originalul";
+"Pastreaza originalul in fisier" = "Pastreaza originalul in fisier";
+"Fisierul devine imaginea editata, ca in Preview. Alte aplicatii vad editarile. Poti recupera versiunea dinainte din Fisier > Revino la." = "Fisierul devine imaginea editata, ca in Preview. Alte aplicatii vad editarile. Poti recupera versiunea dinainte din Fisier > Revino la.";
+"Fisierul original ramane neatins; editarile stau intr-un fisier .p2m alaturi. Reversibil oricand, dar alte aplicatii vad originalul needitat — foloseste Salveaza ca... ca sa obtii imaginea editata." = "Fisierul original ramane neatins; editarile stau intr-un fisier .p2m alaturi. Reversibil oricand, dar alte aplicatii vad originalul needitat — foloseste Salveaza ca... ca sa obtii imaginea editata.";
+"Fisierul devine imaginea editata si poarta originalul in interior, deci poti reveni oricand. Alte aplicatii vad editarile. Fisierul creste cu marimea originalului." = "Fisierul devine imaginea editata si poarta originalul in interior, deci poti reveni oricand. Alte aplicatii vad editarile. Fisierul creste cu marimea originalului.";
+"Atentie: cu aceasta setare, imaginea trimisa prin e-mail sau vazuta in Finder este cea NEEDITATA." = "Atentie: cu aceasta setare, imaginea trimisa prin e-mail sau vazuta in Finder este cea NEEDITATA.";
+"Setarea decide cum se scriu fisierele de acum incolo. Fisierele deja salvate se citesc dupa cum au fost scrise, deci poti schimba modul oricand fara sa strici ce ai salvat." = "Setarea decide cum se scriu fisierele de acum incolo. Fisierele deja salvate se citesc dupa cum au fost scrise, deci poti schimba modul oricand fara sa strici ce ai salvat.";
+"Nu am putut scrie fisierul de editari alaturi de imagine." = "Nu am putut scrie fisierul de editari alaturi de imagine.";
+"Nu am putut citi imaginea originala pentru a o pastra in fisier." = "Nu am putut citi imaginea originala pentru a o pastra in fisier.";

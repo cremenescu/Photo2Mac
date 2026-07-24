@@ -227,3 +227,17 @@
 "Creste unghiul" = "Increase angle";
 "Sau roteste cu doua degete pe trackpad." = "Or rotate with two fingers on the trackpad.";
 "Photo2Mac nu poate scrie formatul %@. Foloseste Salveaza ca... si alege JPEG, PNG, HEIC sau TIFF." = "Photo2Mac cannot write %@ files. Use Save As... and pick JPEG, PNG, HEIC or TIFF.";
+
+/* Save modes */
+"Salvare" = "Saving";
+"Cand salvezi peste fisier (Cmd+S)" = "When you save over the file (Cmd+S)";
+"Salveaza ce vezi" = "Save what you see";
+"Nu modifica originalul" = "Never modify the original";
+"Pastreaza originalul in fisier" = "Keep the original inside the file";
+"Fisierul devine imaginea editata, ca in Preview. Alte aplicatii vad editarile. Poti recupera versiunea dinainte din Fisier > Revino la." = "The file becomes the edited image, like Preview does. Other apps see your edits. You can recover the previous version from File > Revert To.";
+"Fisierul original ramane neatins; editarile stau intr-un fisier .p2m alaturi. Reversibil oricand, dar alte aplicatii vad originalul needitat — foloseste Salveaza ca... ca sa obtii imaginea editata." = "The original file is never touched; your edits live in a .p2m file beside it. Reversible forever, but other apps see the unedited original — use Save As... to produce the edited image.";
+"Fisierul devine imaginea editata si poarta originalul in interior, deci poti reveni oricand. Alte aplicatii vad editarile. Fisierul creste cu marimea originalului." = "The file becomes the edited image and carries the original inside it, so you can always go back. Other apps see your edits. The file grows by the size of the original.";
+"Atentie: cu aceasta setare, imaginea trimisa prin e-mail sau vazuta in Finder este cea NEEDITATA." = "Careful: with this setting, the image you email or see in Finder is the UNEDITED one.";
+"Setarea decide cum se scriu fisierele de acum incolo. Fisierele deja salvate se citesc dupa cum au fost scrise, deci poti schimba modul oricand fara sa strici ce ai salvat." = "This setting controls how files are written from now on. Already-saved files are read the way they were written, so you can change the mode at any time without breaking what you have saved.";
+"Nu am putut scrie fisierul de editari alaturi de imagine." = "Could not write the edits file next to the image.";
+"Nu am putut citi imaginea originala pentru a o pastra in fisier." = "Could not read the original image in order to keep it inside the file.";

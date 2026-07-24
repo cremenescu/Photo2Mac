@@ -104,16 +104,13 @@ final class SaveRoundTripTests: XCTestCase {
         XCTAssertTrue(isRedish(try color(of: reloaded, atFractionX: 0.95, y: 0.05)),
                       "saved pixels should already carry the 90-degree rotation")
 
-        // 3. The stack that the app restores from the file's XMP.
-        let restored = XMPStack.read(from: src)
+        // 3. Resolve the file the way the app does on open.
+        let live = liveStack(for: src)
 
-        // 4. Render the reopened document through that restored stack — this is
-        //    what the user sees after reopening.
-        let doc2 = OpenImage(url: src, image: reloaded)
-        if let restored { doc2.applyRestoredStack(restored) }
+        // 4. Render the reopened document — this is what the user sees.
         let shown = ImageRenderer.render(original: reloaded,
                                          sourceCI: ImageRenderer.makeCIImage(from: reloaded),
-                                         stack: doc2.stack)
+                                         stack: live)
 
         // The marker must still be top-right. If the stack was re-applied it is
         // now bottom-right (180 degrees total).
@@ -148,16 +145,22 @@ final class SaveRoundTripTests: XCTestCase {
         XCTAssertEqual(savedPixels.w, fullPixels.w / 2, accuracy: 2,
                        "saved file should be half width")
 
-        let restored = XMPStack.read(from: src)
-        let doc2 = OpenImage(url: src, image: reloaded)
-        if let restored { doc2.applyRestoredStack(restored) }
         let shown = ImageRenderer.render(original: reloaded,
                                          sourceCI: ImageRenderer.makeCIImage(from: reloaded),
-                                         stack: doc2.stack)
+                                         stack: liveStack(for: src))
         let shownPixels = try pixelSize(of: shown)
 
         XCTAssertEqual(shownPixels.w, savedPixels.w, accuracy: 2,
                        "reopening re-applied the saved crop: the image shrank again")
+    }
+
+    /// The stack the app would make live for this file, resolved from the file
+    /// itself (not from the current save-mode preference).
+    private func liveStack(for url: URL) -> EditStack {
+        switch SavedState.resolve(for: url) {
+        case .editable(let stack, _): return stack
+        case .flattened, .none:       return EditStack()
+        }
     }
 
     private func pixelSize(of image: NSImage) throws -> (w: CGFloat, h: CGFloat) {

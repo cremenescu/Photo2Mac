@@ -35,7 +35,20 @@ enum SaveService {
     /// Render through the stack and write to `url` with XMP-embedded stack.
     /// On success, clears the autosave (file is the source of truth now).
     @discardableResult
-    static func write(doc: OpenImage, to url: URL) -> URL? {
+    static func write(doc: OpenImage, to url: URL,
+                      mode: SaveMode = AppSettings.shared.saveMode) -> URL? {
+        // Mode B never rewrites the image: the edits go into a sidecar and the
+        // original bytes stay exactly as they were.
+        if mode == .sidecar, url == doc.url {
+            guard SidecarStore.write(stack: doc.stack, for: url) else {
+                NSAlert.fail(t("Nu am putut scrie fisierul de editari alaturi de imagine."))
+                    .runModal()
+                return nil
+            }
+            AutosaveStore.shared.clear(for: doc.url)
+            return url
+        }
+
         guard let uti = XMPStack.utiType(for: url) else {
             NSAlert.fail(t("Photo2Mac nu poate scrie formatul %@. Foloseste Salveaza ca... si alege JPEG, PNG, HEIC sau TIFF.",
                             url.pathExtension.uppercased()))
@@ -52,14 +65,36 @@ enum SaveService {
             NSAlert.fail(t("Nu am putut randa imaginea.")).runModal()
             return nil
         }
+
+        // What goes in the XMP depends on the mode, and the file records which
+        // mode wrote it so reopening cannot misread it.
+        var extraTags: [String: String] = [
+            SavedState.modeProperty: mode.rawValue
+        ]
+        // The stack is written for provenance in every mode; only mode C marks
+        // it as re-applicable, by shipping the original alongside it.
+        if mode == .embeddedOriginal {
+            guard let originalBytes = doc.pristineOriginalData() else {
+                NSAlert.fail(t("Nu am putut citi imaginea originala pentru a o pastra in fisier."))
+                    .runModal()
+                return nil
+            }
+            extraTags[SavedState.originalProperty] =
+                originalBytes.base64EncodedString()
+            extraTags[SavedState.originalTypeProperty] =
+                (XMPStack.utiType(for: doc.url) as String?) ?? ""
+        }
+
         let ok = XMPStack.write(
             stack: doc.stack, image: cg, to: url, utiType: uti,
-            sourceURL: doc.url)
+            sourceURL: doc.url, extraTags: extraTags)
         if !ok {
             NSAlert.fail(t("Scrierea fisierului a esuat la %@.", url.lastPathComponent))
                 .runModal()
             return nil
         }
+        // A stale sidecar next to a now-flattened file would re-apply the edits.
+        if mode != .sidecar { SidecarStore.clear(for: url) }
         AutosaveStore.shared.clear(for: doc.url)
         return url
     }

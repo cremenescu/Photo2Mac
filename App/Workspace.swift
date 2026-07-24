@@ -22,14 +22,33 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
     }
     @Published var history = UndoHistory()
 
-    init(url: URL, image: NSImage) {
+    /// Bytes of the untouched original, when we have them. For a file that was
+    /// saved in `.embeddedOriginal` mode this is the copy extracted from its
+    /// XMP; otherwise it is the file as it was when opened. Nil once the file
+    /// has been flattened and no original survives anywhere.
+    private(set) var originalFileData: Data?
+
+    /// Edits that are already baked into the pixels of a flattened file. Shown
+    /// as provenance in the metadata inspector; never re-applied.
+    @Published var recordedHistory: EditStack?
+
+    init(url: URL, image: NSImage, originalFileData: Data? = nil) {
         self.url = url
         self.originalImage = image
         self.displayImage = image
         self.stack = EditStack()
+        self.originalFileData = originalFileData
         // Convert source to CIImage once. Subsequent renders skip the
         // costly NSImage->CGImage->CIImage round-trip.
         self.sourceCIImage = ImageRenderer.makeCIImage(from: image)
+    }
+
+    /// The original bytes to embed when saving in `.embeddedOriginal` mode.
+    /// Falls back to reading the file, which is correct whenever the file has
+    /// not been flattened yet.
+    func pristineOriginalData() -> Data? {
+        if let originalFileData { return originalFileData }
+        return try? Data(contentsOf: url)
     }
 
     var displayName: String { url.lastPathComponent }
@@ -200,25 +219,52 @@ final class Workspace: ObservableObject {
             NSSound.beep()
             return nil
         }
-        let doc = OpenImage(url: url, image: img)
+
+        // How this file must be read is decided by the FILE, not by the current
+        // save-mode preference — otherwise saving in one mode and switching the
+        // setting would make us misinterpret our own output.
+        let saved = SavedState.resolve(for: url)
+
+        var image = img
+        var originalData: Data?
+        if case .editable(_, let embedded) = saved, let embedded,
+           let restoredOriginal = NSImage(data: embedded) {
+            // Mode C: the pixels on disk are the flattened result, but the file
+            // carries the untouched original — edit from that instead.
+            image = restoredOriginal
+            originalData = embedded
+        }
+
+        let doc = OpenImage(url: url, image: image, originalFileData: originalData)
         documents.append(doc)
         selectedID = doc.id
         RecentFiles.shared.add(url)
-        restoreEdits(for: doc)
+        restoreEdits(for: doc, saved: saved)
         return doc
     }
 
-    /// Restore an EditStack from XMP (silent, file-embedded) or from autosave
-    /// (prompt: user can continue or discard).
-    private func restoreEdits(for doc: OpenImage) {
-        // 1. XMP in the file itself wins.
-        if let xmp = XMPStack.read(from: doc.url) {
-            doc.applyRestoredStack(xmp)
-            // File-embedded stack supersedes any older autosave.
+    /// Apply whatever edits belong to this file: a re-applicable stack when the
+    /// original pixels are available, otherwise nothing (the pixels are already
+    /// final and re-applying would double every edit).
+    private func restoreEdits(for doc: OpenImage, saved: SavedState) {
+        switch saved {
+        case .editable(let stack, _):
+            doc.applyRestoredStack(stack)
             AutosaveStore.shared.clear(for: doc.url)
             return
+
+        case .flattened(let recorded):
+            // The pixels already contain these edits. Keep the record for the
+            // metadata inspector, but start the live stack neutral.
+            doc.recordedHistory = recorded
+            AutosaveStore.shared.clear(for: doc.url)
+            return
+
+        case .none:
+            break
         }
-        // 2. Autosave fallback — ask.
+
+        // No edits in the file — offer the invisible autosave, if any.
         guard let pending = AutosaveStore.shared.load(for: doc.url),
               !pending.isNeutral else {
             return

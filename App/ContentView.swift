@@ -1441,6 +1441,31 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section(t("Salvare")) {
+                Picker(t("Cand salvezi peste fisier (Cmd+S)"), selection: Binding(
+                    get: { settings.saveMode },
+                    set: { settings.saveMode = $0 }
+                )) {
+                    ForEach(SaveMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.inline)
+                Text(settings.saveMode.explanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if settings.saveMode == .sidecar {
+                    Text(t("Atentie: cu aceasta setare, imaginea trimisa prin e-mail sau vazuta in Finder este cea NEEDITATA."))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(t("Setarea decide cum se scriu fisierele de acum incolo. Fisierele deja salvate se citesc dupa cum au fost scrise, deci poti schimba modul oricand fara sa strici ce ai salvat."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Section(t("Limba")) {
                 Picker(t("Limba aplicatiei"), selection: Binding(
                     get: { LanguageManager.shared.choice },
