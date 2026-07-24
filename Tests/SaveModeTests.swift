@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Razvan Cremenescu
 
 import XCTest
+import ImageIO
+import UniformTypeIdentifiers
 import AppKit
 @testable import Photo2Mac
 
@@ -229,5 +231,112 @@ final class SaveModeTests: XCTestCase {
         }
         XCTAssertEqual(try reopen(url).renderedWidth, 32,
                        "legacy file was cropped twice")
+    }
+}
+
+/// Saving the same file over and over must not degrade its metadata.
+///
+/// This is a regression test for a genuinely nasty ImageIO behaviour: building
+/// the destination metadata with CGImageMetadataCreateMutableCopy of the
+/// source's XMP works on the FIRST write and then silently drops some custom
+/// properties on the second — so a file lost its edit stack on the second
+/// Cmd+S while looking perfectly fine after the first.
+extension SaveModeTests {
+
+    func testRepeatedSavesKeepTheMarkers() throws {
+        for mode in [SaveMode.flattened, .embeddedOriginal] {
+            let url = try makeFixtureForRepeatedSaves()
+            defer { try? FileManager.default.removeItem(at: url) }
+            let trueOriginal = try Data(contentsOf: url)
+
+            guard let img = NSImage(contentsOf: url) else { throw XCTSkip("x") }
+            let doc = OpenImage(url: url, image: img)
+
+            for pass in 1...10 {
+                doc.stack.rotateDegrees = Double(pass)
+                XCTAssertNotNil(SaveService.write(doc: doc, to: url, mode: mode),
+                                "\(mode) save \(pass) failed")
+
+                XCTAssertEqual(XMPStack.readP2MString(SavedState.modeProperty, from: url),
+                               mode.rawValue,
+                               "\(mode): save \(pass) lost the save-mode marker")
+                XCTAssertNotNil(XMPStack.read(from: url),
+                                "\(mode): save \(pass) lost the edit stack")
+
+                if mode == .embeddedOriginal {
+                    let embedded = XMPStack
+                        .readP2MString(SavedState.originalProperty, from: url)
+                        .flatMap { Data(base64Encoded: $0) }
+                    XCTAssertEqual(embedded, trueOriginal,
+                                   "\(mode): save \(pass) corrupted the embedded original")
+                }
+            }
+        }
+    }
+
+    /// Third-party XMP written by another tool must survive our saves.
+    func testForeignXMPSurvivesRepeatedSaves() throws {
+        let url = try makeFixtureForRepeatedSaves()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        // Pretend Lightroom left a rights statement in the file's XMP.
+        let md = CGImageMetadataCreateMutable()
+        let ns = "http://ns.adobe.com/xap/1.0/rights/"
+        CGImageMetadataRegisterNamespaceForPrefix(md, ns as CFString, "xmpRights" as CFString, nil)
+        if let tag = CGImageMetadataTagCreate(ns as CFString, "xmpRights" as CFString,
+                                              "WebStatement" as CFString, .string,
+                                              "https://example.org/rights" as CFTypeRef) {
+            CGImageMetadataSetTagWithPath(md, nil, "xmpRights:WebStatement" as CFString, tag)
+        }
+        guard let img = NSImage(contentsOf: url),
+              let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let dest = CGImageDestinationCreateWithURL(
+                url as CFURL, UTType.png.identifier as CFString, 1, nil)
+        else { throw XCTSkip("cannot seed foreign xmp") }
+        CGImageDestinationAddImageAndMetadata(dest, cg, md, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(dest))
+        XCTAssertNotNil(readForeignRights(url), "fixture should carry the foreign tag")
+
+        guard let reopened = NSImage(contentsOf: url) else { throw XCTSkip("x") }
+        let doc = OpenImage(url: url, image: reopened)
+        for pass in 1...3 {
+            doc.stack.rotateDegrees = Double(pass)
+            XCTAssertNotNil(SaveService.write(doc: doc, to: url, mode: .flattened))
+            XCTAssertEqual(readForeignRights(url), "https://example.org/rights",
+                           "save \(pass) discarded another tool's XMP")
+        }
+    }
+
+    private func readForeignRights(_ url: URL) -> String? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let md = CGImageSourceCopyMetadataAtIndex(src, 0, nil),
+              let tag = CGImageMetadataCopyTagWithPath(
+                md, nil, "xmpRights:WebStatement" as CFString),
+              let v = CGImageMetadataTagCopyValue(tag)
+        else { return nil }
+        return (v as? String) ?? ((v as? NSString) as String?)
+    }
+
+    private func makeFixtureForRepeatedSaves() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("p2m-rep-\(UUID().uuidString).png")
+        let size = 48
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+            isPlanar: false, colorSpaceName: .deviceRGB,
+            bytesPerRow: 0, bitsPerPixel: 0),
+            let ctx = NSGraphicsContext(bitmapImageRep: rep)
+        else { throw XCTSkip("no bitmap context") }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = ctx
+        NSColor.red.setFill()
+        NSRect(x: 0, y: 0, width: size, height: size).fill()
+        ctx.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
+        guard let data = rep.representation(using: .png, properties: [:])
+        else { throw XCTSkip("no png") }
+        try data.write(to: url)
+        return url
     }
 }

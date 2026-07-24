@@ -11,11 +11,23 @@ final class RecentFiles: ObservableObject {
 
     @Published var urls: [URL] = []
 
+    /// True while the process is hosting an XCTest run.
+    static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     private init() {
+        // Under `xcodebuild test` the app itself is the test host, so its UI
+        // launches too: the welcome screen would build thumbnails for the real
+        // recent files and macOS would put up a "would like to access files in
+        // your Downloads folder" prompt in the middle of the run. Tests have no
+        // business reading the user's documents.
+        guard !Self.isRunningTests else { return }
         load()
     }
 
     func add(_ url: URL) {
+        guard !Self.isRunningTests else { return }
         var list = urls
         list.removeAll { $0 == url }
         list.insert(url, at: 0)

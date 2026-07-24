@@ -44,11 +44,21 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
     }
 
     /// The original bytes to embed when saving in `.embeddedOriginal` mode.
-    /// Falls back to reading the file, which is correct whenever the file has
-    /// not been flattened yet.
+    /// Falls back to reading the file, which is correct only while the file has
+    /// not been flattened yet — so the result is remembered (see
+    /// `rememberOriginalData`) before the first write replaces those bytes.
     func pristineOriginalData() -> Data? {
         if let originalFileData { return originalFileData }
         return try? Data(contentsOf: url)
+    }
+
+    /// Pin the original bytes to the document. Called by SaveService after a
+    /// successful embedded-original write: from that point the file on disk is
+    /// the flattened result, so re-reading it would embed the edited image as
+    /// the "original" on the next save, and every recovery afterwards would
+    /// hand the user back an already-edited photo.
+    func rememberOriginalData(_ data: Data) {
+        if originalFileData == nil { originalFileData = data }
     }
 
     var displayName: String { url.lastPathComponent }

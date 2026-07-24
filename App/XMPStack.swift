@@ -76,7 +76,18 @@ enum XMPStack {
         // Read EVERYTHING from the source before opening the destination: when
         // saving in place the two are the same file, and reading it after
         // ImageIO has taken it for writing is asking for trouble.
-        let md = copyOfSourceMetadata(sourceURL) ?? CGImageMetadataCreateMutable()
+        //
+        // The metadata object is built FRESH and the source's foreign XMP is
+        // copied onto it tag by tag. Handing ImageIO a
+        // CGImageMetadataCreateMutableCopy of the source instead looks tidier
+        // and works the first time, but on the SECOND write of the same file it
+        // silently drops some of the custom properties while keeping others —
+        // measured: p2m:saveMode and p2m:editStack vanished while
+        // p2m:originalImage and p2m:originalType survived, even though all four
+        // were present in the object handed to CGImageDestination. That is what
+        // made a file lose its edit stack on the second Cmd+S.
+        let md = CGImageMetadataCreateMutable()
+        copyForeignXMP(from: sourceURL, into: md)
         var options = sourceProperties(sourceURL)
         options[kCGImageDestinationLossyCompressionQuality] = jpegQuality
 
@@ -107,13 +118,35 @@ enum XMPStack {
         return CGImageDestinationFinalize(dest)
     }
 
-    /// A mutable copy of the source file's XMP, or nil when there is none.
-    private static func copyOfSourceMetadata(_ sourceURL: URL?) -> CGMutableImageMetadata? {
+    /// Namespaces we do NOT copy from the source:
+    /// - `p2m` is ours and is rewritten from scratch on every save;
+    /// - `exif` / `tiff` are re-derived by ImageIO from the destination
+    ///   properties, which carry the real EXIF/TIFF segments;
+    /// - `iio` is ImageIO's own bookkeeping.
+    private static let nonPortablePrefixes: Set<String> = [prefix, "exif", "tiff", "iio"]
+
+    /// Copy the source's third-party XMP (dc, xmpRights, photoshop, Lightroom,
+    /// Capture One, ...) onto a fresh metadata object, so editing a photo in
+    /// Photo2Mac does not throw away metadata another tool wrote.
+    private static func copyForeignXMP(from sourceURL: URL?,
+                                        into md: CGMutableImageMetadata) {
         guard let sourceURL,
               let src = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
-              let existing = CGImageSourceCopyMetadataAtIndex(src, 0, nil)
-        else { return nil }
-        return CGImageMetadataCreateMutableCopy(existing)
+              let existing = CGImageSourceCopyMetadataAtIndex(src, 0, nil),
+              let tags = CGImageMetadataCopyTags(existing) as? [CGImageMetadataTag]
+        else { return }
+
+        for tag in tags {
+            guard let pfx = CGImageMetadataTagCopyPrefix(tag) as String?,
+                  let name = CGImageMetadataTagCopyName(tag) as String?,
+                  let ns = CGImageMetadataTagCopyNamespace(tag) as String?,
+                  !nonPortablePrefixes.contains(pfx)
+            else { continue }
+            CGImageMetadataRegisterNamespaceForPrefix(
+                md, ns as CFString, pfx as CFString, nil)
+            CGImageMetadataSetTagWithPath(
+                md, nil, "\(pfx):\(name)" as CFString, tag)
+        }
     }
 
     /// The source file's properties (EXIF / GPS / TIFF / IPTC), cleaned of the
@@ -131,6 +164,17 @@ enum XMPStack {
         props.removeValue(forKey: kCGImagePropertyPixelWidth)
         props.removeValue(forKey: kCGImagePropertyPixelHeight)
         props[kCGImagePropertyOrientation] = 1
+
+        // Do NOT forward IPTC. ImageIO keeps IPTC and XMP in sync, so handing it
+        // an {IPTC} dictionary alongside a CGImageMetadata makes it REBUILD the
+        // XMP packet from the properties — silently dropping every namespace it
+        // does not know, p2m included. The symptom is brutal and easy to miss:
+        // the FIRST save of a file is fine, and the second one loses the edit
+        // stack and the save-mode marker, because the first save is what created
+        // the IPTC block (from dc:description). The IPTC content we care about
+        // is already in `md`, which is a copy of the source's own XMP.
+        props.removeValue(forKey: kCGImagePropertyIPTCDictionary)
+        props.removeValue(forKey: "{Photoshop}" as CFString)
 
         if var tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
             tiff[kCGImagePropertyTIFFOrientation] = 1

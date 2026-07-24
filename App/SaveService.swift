@@ -77,12 +77,17 @@ enum SaveService {
         ]
         // The stack is written for provenance in every mode; only mode C marks
         // it as re-applicable, by shipping the original alongside it.
+        var embeddedOriginalBytes: Data?
         if effectiveMode == .embeddedOriginal {
+            // Read the original BEFORE the write, and pin it to the document
+            // afterwards — after this write the file on disk is the flattened
+            // result, so a later save must not re-read it as "the original".
             guard let originalBytes = doc.pristineOriginalData() else {
                 NSAlert.fail(t("Nu am putut citi imaginea originala pentru a o pastra in fisier."))
                     .runModal()
                 return nil
             }
+            embeddedOriginalBytes = originalBytes
             extraTags[SavedState.originalProperty] =
                 originalBytes.base64EncodedString()
             extraTags[SavedState.originalTypeProperty] =
@@ -96,6 +101,9 @@ enum SaveService {
             NSAlert.fail(t("Scrierea fisierului a esuat la %@.", url.lastPathComponent))
                 .runModal()
             return nil
+        }
+        if let embeddedOriginalBytes {
+            doc.rememberOriginalData(embeddedOriginalBytes)
         }
         // A stale sidecar next to a now-flattened file would re-apply the edits.
         SidecarStore.clear(for: url)
