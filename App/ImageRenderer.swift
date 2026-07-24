@@ -49,9 +49,14 @@ public enum ImageRenderer {
             ci = rotated.transformed(by: CGAffineTransform(translationX: dx, y: dy))
         }
         if let c = stack.crop, c.width > 0, c.height > 0 {
+            // CropRect.y is measured from the TOP of the image: it is produced
+            // by CropEditState against the canvas NSView, which is flipped
+            // (ImageCanvasView: isFlipped = true). A CIImage built from a
+            // CGImage has its origin at the BOTTOM, so y must be flipped here
+            // or every off-centre crop keeps the mirrored band.
             let r = CGRect(
                 x: c.x * ci.extent.width,
-                y: c.y * ci.extent.height,
+                y: (1.0 - c.y - c.height) * ci.extent.height,
                 width: c.width * ci.extent.width,
                 height: c.height * ci.extent.height
             )
