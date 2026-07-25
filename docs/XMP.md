@@ -15,12 +15,53 @@ read, inspect or even synthesize a Photo2Mac edit stack.
 |--|--|
 | **URI**    | `http://ns.photo2mac.cremenescu.ro/1.0/` |
 | **Prefix** | `p2m` |
-| **Property** | `p2m:editStack` |
-| **Type**   | string (UTF-8 JSON) |
 
-The property is a single string holding a JSON-encoded `EditStack`. Storing
+| Property | Type | Meaning |
+|----------|------|---------|
+| `p2m:editStack`    | string (UTF-8 JSON) | the `EditStack` — see the schema below |
+| `p2m:saveMode`     | string | how this file was written: `flattened` or `embeddedOriginal` |
+| `p2m:originalImage`| string (base64) | the untouched original file, present only when `saveMode` is `embeddedOriginal` |
+| `p2m:originalType` | string (UTI)    | format of those original bytes, e.g. `public.jpeg` |
+
+`p2m:editStack` is a single string holding a JSON-encoded `EditStack`. Storing
 JSON inside an XMP string keeps the format trivially portable: any tool that
 can read XMP can pull the recipe out, no schema awareness required.
+
+## How a file must be read
+
+**Crucially: `p2m:editStack` alone does not tell you whether the edits are
+already in the pixels.** `p2m:saveMode` does. Photo2Mac lets the user choose
+what Cmd+S does, so:
+
+| Situation | Pixels on disk | What to do with the stack |
+|-----------|----------------|---------------------------|
+| `.p2m` sidecar exists next to the file | the untouched original | apply it |
+| `saveMode` = `embeddedOriginal` | already edited | decode `p2m:originalImage` and apply the stack to *that* |
+| `saveMode` = `flattened` | already edited | **do not apply** — it is a record of what was done |
+| `editStack` present, no `saveMode` | already edited | **do not apply** (see below) |
+| nothing | original | nothing to do |
+
+The last row is the compatibility rule for files written by Photo2Mac
+v0.1.0 – v0.2.1. Those versions baked the edits into the pixels *and* wrote a
+stack with no mode marker, so re-applying it double-applied every edit and
+compounded on each save. Absent a marker, assume the pixels are final.
+
+## The sidecar (`SaveMode.sidecar`)
+
+In sidecar mode the image file is never modified; the recipe lives beside it as
+`<filename>.<ext>.p2m`, a JSON document:
+
+```json
+{
+  "version": 1,
+  "stack": { "...": "an EditStack, same schema as below" },
+  "sourceSize": 482913,
+  "sourceModified": 774829200.0
+}
+```
+
+`sourceSize` is checked on read: a sidecar left behind next to a file that has
+since been replaced is ignored rather than applied to the wrong pixels.
 
 ## Container formats
 

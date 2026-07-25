@@ -241,3 +241,5 @@
 "Setarea decide cum se scriu fisierele de acum incolo. Fisierele deja salvate se citesc dupa cum au fost scrise, deci poti schimba modul oricand fara sa strici ce ai salvat." = "This setting controls how files are written from now on. Already-saved files are read the way they were written, so you can change the mode at any time without breaking what you have saved.";
 "Nu am putut scrie fisierul de editari alaturi de imagine." = "Could not write the edits file next to the image.";
 "Nu am putut citi imaginea originala pentru a o pastra in fisier." = "Could not read the original image in order to keep it inside the file.";
+"Imaginea originala e prea mare (%d MB) ca sa incapa in fisier. Alege alt mod de salvare in Preferinte." = "The original image is too large (%d MB) to keep inside the file. Choose a different save mode in Settings.";
+"Fisierul a fost scris, dar Photo2Mac nu poate reciti informatiile de editare din el." = "The file was written, but Photo2Mac cannot read its editing information back.";

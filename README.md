@@ -13,13 +13,26 @@ A native macOS image editor — simple, fast, **non-destructive**.
 
 ## Status
 
-In development — `v0.1.0-alpha` (phase 1: single-image editor).
+In development — `v0.2.1-alpha` (phase 1: single-image editor).
 
 The pixels of the original file are never touched until you Save. Every
 adjustment (crop, rotate, flip, brightness, contrast, saturation,
-exposure) lives on an `EditStack` that is rendered live by Core Image
-and persisted into the XMP metadata of the saved file. Re-opening the
-same file in Photo2Mac restores the stack so you can keep editing.
+exposure) lives on an `EditStack` that is rendered live by Core Image.
+
+What Save then does to the file is **your choice**, in Settings, because
+the honest answers differ:
+
+| Mode | Cmd+S writes | Other apps see | Can you undo it later? |
+|------|--------------|----------------|------------------------|
+| **Save what you see** (default) | the edited image | your edits | via File ▸ Revert To (macOS versions) |
+| **Never modify the original** | a `.p2m` file beside it | the *unedited* original | yes, always |
+| **Keep the original inside** | the edited image, carrying the original | your edits | yes, always (file is ~2× larger) |
+
+The setting controls how files are **written**; each file records how it
+was written, so a file is always **read** the way it was saved. Changing
+the mode never invalidates anything already on disk.
+
+Saving preserves the source's EXIF, GPS, copyright and colour profile.
 
 ## Screenshots
 
@@ -44,9 +57,9 @@ same file in Photo2Mac restores the stack so you can keep editing.
 - **Tune** with brightness / contrast / saturation / exposure sliders
   and a live histogram (Luminance / RGB / R / G / B).
 - **Edits list** popover in the toolbar, with per-row revert.
-- **Save** (Cmd+S) overwrites the open file with rendered pixels +
-  embedded XMP `EditStack`; **Save As** (Cmd+Shift+S) prompts for a
-  destination.
+- **Save** (Cmd+S) in one of three modes, chosen in Settings (see the
+  table above); **Save As** (Cmd+Shift+S) prompts for a destination.
+  Source EXIF, GPS, copyright and ICC profile are carried across.
 - **Invisible autosave** in `~/Library/Application Support/Photo2Mac/`
   so unsaved edits survive a tab close.
 - **Welcome screen** with recent files, **Metadata viewer** (EXIF +

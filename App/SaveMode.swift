@@ -3,6 +3,7 @@
 
 import Foundation
 import AppKit
+import ImageIO
 
 /// What Cmd+S does to the file on disk.
 ///
@@ -120,34 +121,54 @@ enum SavedState {
     /// Nothing of ours in this file.
     case none
 
+    /// An embedded "original" is only trustworthy if it is actually an image.
+    /// Valid base64 is not enough: a mode-C JPEG stores the payload as an Adobe
+    /// ExtendedXMP chain, and any tool that rewrites XMP without full
+    /// ExtendedXMP support drops trailing chunks — base64 is conventionally
+    /// wrapped at multiples of 4, so the truncation stays decodable and would
+    /// otherwise be adopted as "the untouched original" and written over the
+    /// photo on the next save.
+    static func isDecodableImage(_ data: Data) -> Bool {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetType(src) != nil,
+              CGImageSourceGetCount(src) > 0,
+              CGImageSourceCreateImageAtIndex(src, 0, nil) != nil
+        else { return false }
+        return true
+    }
+
     /// Property names used in XMP.
     static let modeProperty = "saveMode"
     static let originalProperty = "originalImage"
     static let originalTypeProperty = "originalType"
 
     static func resolve(for url: URL) -> SavedState {
-        // 1. A sidecar means the file on disk is the untouched original.
+        let recorded = XMPStack.read(from: url)
+        let mode = XMPStack.readP2MString(modeProperty, from: url)
+
+        // 1. The file's own marker is consulted FIRST. A sidecar sitting next
+        //    to a file that was written with baked pixels is stale — trusting
+        //    it would apply a stack the pixels already contain.
+        if mode == SaveMode.embeddedOriginal.rawValue,
+           let b64 = XMPStack.readP2MString(originalProperty, from: url),
+           let data = Data(base64Encoded: b64),
+           isDecodableImage(data),
+           let stack = recorded {
+            return .editable(stack: stack, originalData: data)
+        }
+        if mode != nil {
+            // Marked as written by us with baked pixels (or an embedded
+            // original we could not decode — in which case the pixels are still
+            // final, so treating it as flattened is the safe reading).
+            return .flattened(recordedStack: recorded)
+        }
+
+        // 2. No marker: a sidecar means the pixels are the untouched original.
         if let stack = SidecarStore.read(for: url) {
             return .editable(stack: stack, originalData: nil)
         }
 
-        let recorded = XMPStack.read(from: url)
-        let mode = XMPStack.readP2MString(modeProperty, from: url)
-
-        // 2. Original embedded in the file: decode it and stay fully editable.
-        if mode == SaveMode.embeddedOriginal.rawValue,
-           let b64 = XMPStack.readP2MString(originalProperty, from: url),
-           let data = Data(base64Encoded: b64),
-           let stack = recorded {
-            return .editable(stack: stack, originalData: data)
-        }
-
-        // 3. Explicitly flattened.
-        if mode == SaveMode.flattened.rawValue {
-            return .flattened(recordedStack: recorded)
-        }
-
-        // 4. Legacy: files written by v0.1.0 – v0.2.1 carry an edit stack with
+        // 3. Legacy: files written by v0.1.0 – v0.2.1 carry an edit stack with
         //    NO mode marker, and their pixels are already baked. Treating them
         //    as editable is exactly the double-application bug, so they must be
         //    read as flattened.

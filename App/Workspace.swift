@@ -32,6 +32,28 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
     /// as provenance in the metadata inspector; never re-applied.
     @Published var recordedHistory: EditStack?
 
+    /// Whether the bytes currently on disk at `url` are still the untouched
+    /// original for this document.
+    ///
+    /// This is the fact every save decision hinges on, and it is NOT the same
+    /// as the save-mode preference. Once a save has baked pixels into the file,
+    /// the file and this document have diverged: the document still holds the
+    /// pristine `originalImage` plus a live `stack`, while the file already
+    /// contains both combined. A later save that assumes the file is pristine
+    /// applies the stack a second time — which is how switching the preference
+    /// mid-session used to shrink an image 64 -> 32 -> 16 -> 8 px.
+    private(set) var fileHasBakedEdits: Bool = false
+
+    /// Record that the file at `url` now contains rendered pixels.
+    func markFileFlattened() { fileHasBakedEdits = true }
+
+    /// Capture the pristine bytes before the first write destroys them. Safe to
+    /// call repeatedly; only the first pristine copy is kept.
+    func pinOriginalDataIfPristine() {
+        guard originalFileData == nil, !fileHasBakedEdits else { return }
+        originalFileData = try? Data(contentsOf: url)
+    }
+
     init(url: URL, image: NSImage, originalFileData: Data? = nil) {
         self.url = url
         self.originalImage = image
@@ -43,22 +65,16 @@ final class OpenImage: ObservableObject, Identifiable, Equatable {
         self.sourceCIImage = ImageRenderer.makeCIImage(from: image)
     }
 
-    /// The original bytes to embed when saving in `.embeddedOriginal` mode.
-    /// Falls back to reading the file, which is correct only while the file has
-    /// not been flattened yet — so the result is remembered (see
-    /// `rememberOriginalData`) before the first write replaces those bytes.
+    /// The original bytes to embed when saving in `.embeddedOriginal` mode, or
+    /// nil when no pristine copy exists any more.
+    ///
+    /// Never falls back to reading `url` once the file has been flattened: that
+    /// would hand back the EDITED image as "the original", so the user's
+    /// recovery would return an already-cropped photo.
     func pristineOriginalData() -> Data? {
         if let originalFileData { return originalFileData }
+        guard !fileHasBakedEdits else { return nil }
         return try? Data(contentsOf: url)
-    }
-
-    /// Pin the original bytes to the document. Called by SaveService after a
-    /// successful embedded-original write: from that point the file on disk is
-    /// the flattened result, so re-reading it would embed the edited image as
-    /// the "original" on the next save, and every recovery afterwards would
-    /// hand the user back an already-edited photo.
-    func rememberOriginalData(_ data: Data) {
-        if originalFileData == nil { originalFileData = data }
     }
 
     var displayName: String { url.lastPathComponent }

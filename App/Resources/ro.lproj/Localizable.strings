@@ -222,3 +222,5 @@
 "Setarea decide cum se scriu fisierele de acum incolo. Fisierele deja salvate se citesc dupa cum au fost scrise, deci poti schimba modul oricand fara sa strici ce ai salvat." = "Setarea decide cum se scriu fisierele de acum incolo. Fisierele deja salvate se citesc dupa cum au fost scrise, deci poti schimba modul oricand fara sa strici ce ai salvat.";
 "Nu am putut scrie fisierul de editari alaturi de imagine." = "Nu am putut scrie fisierul de editari alaturi de imagine.";
 "Nu am putut citi imaginea originala pentru a o pastra in fisier." = "Nu am putut citi imaginea originala pentru a o pastra in fisier.";
+"Imaginea originala e prea mare (%d MB) ca sa incapa in fisier. Alege alt mod de salvare in Preferinte." = "Imaginea originala e prea mare (%d MB) ca sa incapa in fisier. Alege alt mod de salvare in Preferinte.";
+"Fisierul a fost scris, dar Photo2Mac nu poate reciti informatiile de editare din el." = "Fisierul a fost scris, dar Photo2Mac nu poate reciti informatiile de editare din el.";

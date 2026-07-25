@@ -6,6 +6,11 @@ import UniformTypeIdentifiers
 
 enum SaveService {
 
+    /// Ceiling on the original we are willing to embed in mode C. Above roughly
+    /// 64 MB of payload ImageIO writes a file it cannot read back while
+    /// reporting success; this stays well clear of that cliff.
+    static let maxEmbeddedOriginalBytes = 48 * 1_000_000
+
     /// Save back to the file the document was opened from (overwrite).
     /// macOS automatically captures a filesystem version via NSFileVersion
     /// so the user can recover the previous content from Finder if needed.
@@ -37,9 +42,21 @@ enum SaveService {
     @discardableResult
     static func write(doc: OpenImage, to url: URL,
                       mode: SaveMode = AppSettings.shared.saveMode) -> URL? {
+        // Capture the pristine bytes before anything can overwrite them. Doing
+        // this lazily at embed time is too late: by then an earlier save may
+        // already have replaced the file with the edited image.
+        doc.pinOriginalDataIfPristine()
+
         // Mode B never rewrites the image: the edits go into a sidecar and the
         // original bytes stay exactly as they were.
-        if mode == .sidecar, url == doc.url {
+        //
+        // It is only meaningful while the file still IS the original. If an
+        // earlier save baked pixels into it, a sidecar holding the full stack
+        // would be applied on top of pixels that already contain it — the
+        // double-application bug, re-entered through the back door of changing
+        // the preference mid-session. In that case fall through and flatten:
+        // the promise "never modify the original" is already void for this file.
+        if mode == .sidecar, url == doc.url, !doc.fileHasBakedEdits {
             guard SidecarStore.write(stack: doc.stack, for: url) else {
                 NSAlert.fail(t("Nu am putut scrie fisierul de editari alaturi de imagine."))
                     .runModal()
@@ -77,17 +94,24 @@ enum SaveService {
         ]
         // The stack is written for provenance in every mode; only mode C marks
         // it as re-applicable, by shipping the original alongside it.
-        var embeddedOriginalBytes: Data?
         if effectiveMode == .embeddedOriginal {
-            // Read the original BEFORE the write, and pin it to the document
-            // afterwards — after this write the file on disk is the flattened
-            // result, so a later save must not re-read it as "the original".
+            // No pristine copy means we would be embedding the edited image and
+            // calling it the original. Refuse rather than lie about it.
             guard let originalBytes = doc.pristineOriginalData() else {
                 NSAlert.fail(t("Nu am putut citi imaginea originala pentru a o pastra in fisier."))
                     .runModal()
                 return nil
             }
-            embeddedOriginalBytes = originalBytes
+            // Above roughly 64 MB of payload ImageIO reports a successful write
+            // and produces a file it cannot read back: every p2m tag returns
+            // nil and even NSImage refuses it. Saving in place would replace the
+            // user's photo with that. Measured cliff between 64 MB and 131 MB.
+            guard originalBytes.count <= maxEmbeddedOriginalBytes else {
+                NSAlert.fail(t("Imaginea originala e prea mare (%d MB) ca sa incapa in fisier. Alege alt mod de salvare in Preferinte.",
+                                originalBytes.count / 1_000_000))
+                    .runModal()
+                return nil
+            }
             extraTags[SavedState.originalProperty] =
                 originalBytes.base64EncodedString()
             extraTags[SavedState.originalTypeProperty] =
@@ -102,9 +126,14 @@ enum SaveService {
                 .runModal()
             return nil
         }
-        if let embeddedOriginalBytes {
-            doc.rememberOriginalData(embeddedOriginalBytes)
+        // Verify the write actually round-tripped before declaring success: a
+        // file whose marker did not survive would be misread on reopen.
+        if XMPStack.readP2MString(SavedState.modeProperty, from: url)
+            != effectiveMode.rawValue {
+            NSAlert.fail(t("Fisierul a fost scris, dar Photo2Mac nu poate reciti informatiile de editare din el."))
+                .runModal()
         }
+        if url == doc.url { doc.markFileFlattened() }
         // A stale sidecar next to a now-flattened file would re-apply the edits.
         SidecarStore.clear(for: url)
         AutosaveStore.shared.clear(for: doc.url)
