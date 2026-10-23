@@ -17,6 +17,13 @@ enum InitialZoom: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+/// Keys the canvas handles itself while it has focus.
+enum CanvasKey {
+    case apply, cancel, previous, next
+    /// The before/after key went down (true) or up (false).
+    case compare(Bool)
+}
+
 final class CanvasNSView: NSView {
     var image: NSImage? { didSet { needsDisplay = true } }
     var panEnabled: Bool = true {
@@ -47,6 +54,45 @@ final class CanvasNSView: NSView {
     override var acceptsFirstResponder: Bool { true }
 
     var onUserInteract: (() -> Void)?
+
+    /// Return true when the key was handled; unhandled keys go up the
+    /// responder chain as usual.
+    var onKey: ((CanvasKey) -> Bool)?
+
+    /// Screen points per canvas point. The crop handles are drawn and
+    /// hit-tested in canvas coordinates, so without this they shrink to
+    /// nothing on a large photo fitted to the window and grow huge at 800%.
+    private var screenScale: CGFloat {
+        let m = enclosingScrollView?.magnification ?? 1
+        return m > 0 ? m : 1
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if let key = canvasKey(for: event, down: true), onKey?(key) == true { return }
+        super.keyDown(with: event)
+    }
+
+    override func keyUp(with event: NSEvent) {
+        if event.charactersIgnoringModifiers == "\\", onKey?(.compare(false)) == true { return }
+        super.keyUp(with: event)
+    }
+
+    private func canvasKey(for event: NSEvent, down: Bool) -> CanvasKey? {
+        let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        guard mods.isEmpty else { return nil }
+        switch event.keyCode {
+        case 36, 76: return .apply           // Return, keypad Enter
+        case 53:     return .cancel          // Escape
+        case 123:    return .previous        // left arrow
+        case 124:    return .next            // right arrow
+        default:
+            if event.charactersIgnoringModifiers == "\\" {
+                // Key repeat would flicker between the two images.
+                return event.isARepeat ? nil : .compare(true)
+            }
+            return nil
+        }
+    }
 
     /// Commits the in-progress rotation (clockwise-positive degrees) to the
     /// model — called ONCE when the gesture ends, so Core Image renders only
@@ -203,6 +249,9 @@ final class CanvasNSView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        // Take focus so the canvas keys (arrows, Return, Escape, \\) work
+        // after clicking the image.
+        if window?.firstResponder !== self { window?.makeFirstResponder(self) }
         // Crop mode: intercept clicks if they hit the crop UI.
         if let crop = cropEditState {
             let p = convert(event.locationInWindow, from: nil)
@@ -345,17 +394,21 @@ final class CanvasNSView: NSView {
         NSColor(white: 0, alpha: 0.5).setFill()
         outside.fill()
 
+        // Everything below is sized in SCREEN points and converted, so the
+        // handles look and grab the same at any zoom.
+        let k = 1 / screenScale
+
         // Crop border.
         let borderColor = NSColor.white
         borderColor.setStroke()
         let border = NSBezierPath(rect: cr)
-        border.lineWidth = 1.5
+        border.lineWidth = 1.5 * k
         border.stroke()
 
         // Rule-of-thirds guides.
         NSColor(white: 1, alpha: 0.4).setStroke()
         let thirds = NSBezierPath()
-        thirds.lineWidth = 0.75
+        thirds.lineWidth = 0.75 * k
         for i in 1...2 {
             let x = cr.minX + cr.width * CGFloat(i) / 3.0
             thirds.move(to: NSPoint(x: x, y: cr.minY))
@@ -373,25 +426,25 @@ final class CanvasNSView: NSView {
         let edges:   [CropHandle] = [.topMid, .bottomMid, .midLeft, .midRight]
         for h in corners {
             let center = handleCenter(h, in: cr)
-            let s: CGFloat = 12
+            let s: CGFloat = 12 * k
             let r = NSRect(x: center.x - s / 2, y: center.y - s / 2,
                            width: s, height: s)
-            let p = NSBezierPath(roundedRect: r, xRadius: 2, yRadius: 2)
+            let p = NSBezierPath(roundedRect: r, xRadius: 2 * k, yRadius: 2 * k)
             p.fill()
-            p.lineWidth = 1
+            p.lineWidth = 1 * k
             p.stroke()
         }
         for h in edges {
             let center = handleCenter(h, in: cr)
             // Edge handles drawn as a small pill perpendicular to their axis.
             let isHorizontal = (h == .topMid || h == .bottomMid)
-            let w: CGFloat = isHorizontal ? 24 : 8
-            let hgt: CGFloat = isHorizontal ? 8 : 24
+            let w: CGFloat = (isHorizontal ? 24 : 8) * k
+            let hgt: CGFloat = (isHorizontal ? 8 : 24) * k
             let r = NSRect(x: center.x - w / 2, y: center.y - hgt / 2,
                            width: w, height: hgt)
-            let p = NSBezierPath(roundedRect: r, xRadius: 3, yRadius: 3)
+            let p = NSBezierPath(roundedRect: r, xRadius: 3 * k, yRadius: 3 * k)
             p.fill()
-            p.lineWidth = 1
+            p.lineWidth = 1 * k
             p.stroke()
         }
     }
@@ -425,7 +478,7 @@ final class CanvasNSView: NSView {
     private func cropHandleHitTest(at point: CGPoint, crop: CropEditState) -> CropHandle? {
         let cr = canvasRect(forImageRect: crop.rect, in: imageDrawRect)
         // Test corners first (priority over edges), then edges.
-        let hitR: CGFloat = 18
+        let hitR: CGFloat = 18 / screenScale
         let order: [CropHandle] = [.topLeft, .topRight, .bottomLeft, .bottomRight,
                                     .topMid, .bottomMid, .midLeft, .midRight]
         for h in order {
@@ -443,7 +496,7 @@ final class CanvasNSView: NSView {
         let dx = p.x - dragStartCanvasPoint.x
         let dy = p.y - dragStartCanvasPoint.y
         let imgSize = crop.imageSize
-        let minSize: CGFloat = 16
+        let minSize: CGFloat = min(16 / screenScale, imgSize.width, imgSize.height)
 
         var r = dragStartCropRect
         let aspect = crop.aspect.ratio(imageSize: imgSize)
@@ -620,16 +673,26 @@ struct ImageCanvasView: NSViewRepresentable {
     /// Called with an incremental clockwise-positive degree delta from the
     /// trackpad two-finger rotate gesture (only while the Rotate tool is on).
     var onRotate: ((CGFloat) -> Void)? = nil
+    /// Keys pressed while the canvas has focus.
+    var onKey: ((CanvasKey) -> Bool)? = nil
 
     final class Coordinator {
+        /// The latest version of the view struct. AppKit callbacks that
+        /// outlive one SwiftUI update (resize, end of pinch) read it from here;
+        /// capturing `self` in makeNSView froze them on the first image, zoom
+        /// mode and crop state forever.
+        var parent: ImageCanvasView
         var fittedDocumentID: UUID?
         var lastDocumentID: UUID?
         var userInteracted = false
         var lastViewportSize: CGSize = .zero
         var lastForceFitNonce: Int = 0
+        var magnifyObserver: NSObjectProtocol?
+
+        init(parent: ImageCanvasView) { self.parent = parent }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = CanvasScrollView()
@@ -657,10 +720,11 @@ struct ImageCanvasView: NSViewRepresentable {
         canvas.panEnabled = (tool == .hand)
         canvas.rotationEnabled = (tool == .rotate)
         canvas.onRotateCommit = onRotate
+        canvas.onKey = onKey
         canvas.cropEditState = cropEditState
-        let cFrame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
+        let cFrame = Self.canvasFrame(for: image, in: scroll.contentView.bounds.size)
         canvas.frame = cFrame
-        updateImageRect(clipView: clamping, canvasFrame: cFrame, image: image)
+        Self.updateImageRect(clipView: clamping, canvasFrame: cFrame, image: image)
         canvas.onUserInteract = { [weak coord = context.coordinator] in
             coord?.userInteracted = true
         }
@@ -669,111 +733,140 @@ struct ImageCanvasView: NSViewRepresentable {
         scroll.contentView.postsBoundsChangedNotifications = true
         scroll.contentView.postsFrameChangedNotifications = true
 
-        NotificationCenter.default.addObserver(
+        let coord = context.coordinator
+        coord.magnifyObserver = NotificationCenter.default.addObserver(
             forName: NSScrollView.didEndLiveMagnifyNotification,
             object: scroll,
             queue: .main
-        ) { _ in
-            zoom = scroll.magnification
-            context.coordinator.userInteracted = true
+        ) { [weak coord, weak scroll] _ in
+            guard let coord, let scroll else { return }
+            coord.parent.zoom = scroll.magnification
+            coord.userInteracted = true
+            // The handles are sized for the old magnification.
+            scroll.documentView?.needsDisplay = true
         }
 
         // Auto re-fit / re-center on viewport resize until user manually interacts.
-        scroll.onResize = { [weak scroll] in
-            guard let scroll = scroll else { return }
-            if !context.coordinator.userInteracted {
-                applyInitialFit(scroll: scroll)
+        scroll.onResize = { [weak scroll, weak coord] in
+            guard let scroll, let coord else { return }
+            if !coord.userInteracted {
+                coord.parent.applyInitialFit(scroll: scroll)
             } else {
-                ensureImageVisible(scroll: scroll)
+                Self.ensureImageVisible(scroll: scroll)
             }
         }
 
         return scroll
     }
 
+    static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
+        if let token = coordinator.magnifyObserver {
+            NotificationCenter.default.removeObserver(token)
+            coordinator.magnifyObserver = nil
+        }
+        (scroll as? CanvasScrollView)?.onResize = nil
+    }
+
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let canvas = scroll.documentView as? CanvasNSView else { return }
+        let coord = context.coordinator
+        coord.parent = self
 
         canvas.panEnabled = (tool == .hand)
         canvas.rotationEnabled = (tool == .rotate)
         canvas.onRotateCommit = onRotate
+        canvas.onKey = onKey
         // Keep pinch-zoom out of the way of the rotate gesture.
         let wantMagnify = (tool != .rotate)
         if scroll.allowsMagnification != wantMagnify {
             scroll.allowsMagnification = wantMagnify
         }
+        // Entering or leaving the crop tool refits (entering leaves a margin
+        // so the corner handles are reachable). It is keyed on the crop STATE,
+        // not the tool, because the state arrives asynchronously with an
+        // image of a different size.
+        let cropToggled = (canvas.cropEditState == nil) != (cropEditState == nil)
         if canvas.cropEditState !== cropEditState {
             canvas.cropEditState = cropEditState
         }
 
-        let docChanged = context.coordinator.lastDocumentID != documentID
-        context.coordinator.lastDocumentID = documentID
+        let docChanged = coord.lastDocumentID != documentID
+        coord.lastDocumentID = documentID
 
         if canvas.image !== image {
+            let oldSize = canvas.image?.size ?? .zero
             canvas.image = image
             // Only refit frame + state if it's actually a new document.
             // A re-render of the same document (slider tick) keeps zoom & pan.
             if docChanged {
-                let cFrame = canvasFrame(for: image, in: scroll.contentView.bounds.size)
+                let cFrame = Self.canvasFrame(for: image, in: scroll.contentView.bounds.size)
                 canvas.frame = cFrame
                 if let clip = scroll.contentView as? CanvasClipView {
-                    updateImageRect(clipView: clip, canvasFrame: cFrame, image: image)
+                    Self.updateImageRect(clipView: clip, canvasFrame: cFrame, image: image)
                 }
-                context.coordinator.fittedDocumentID = nil
-                context.coordinator.userInteracted = false
-            } else if let clip = scroll.contentView as? CanvasClipView {
-                // Same document, possibly re-rendered with different geometry
-                // (e.g. crop applied later). Update image rect.
-                updateImageRect(clipView: clip, canvasFrame: canvas.frame, image: image)
+                coord.fittedDocumentID = nil
+                coord.userInteracted = false
+            } else if oldSize != image.size {
+                // Same document, different geometry (crop applied, crop tool
+                // showing the uncropped image, before/after). The padding was
+                // sized for the old image and may now be too small to hold the
+                // new one, so rebuild the frame, keeping the view centred on
+                // the same point relative to the image centre.
+                Self.reframe(scroll: scroll, canvas: canvas, for: image)
             }
         }
 
-        let viewportChanged = abs(context.coordinator.lastViewportSize.width - viewportSize.width) > 0.5 ||
-                              abs(context.coordinator.lastViewportSize.height - viewportSize.height) > 0.5
-        context.coordinator.lastViewportSize = viewportSize
+        let viewportChanged = abs(coord.lastViewportSize.width - viewportSize.width) > 0.5 ||
+                              abs(coord.lastViewportSize.height - viewportSize.height) > 0.5
+        coord.lastViewportSize = viewportSize
 
-        let forceFit = forceFitNonce != context.coordinator.lastForceFitNonce
-        context.coordinator.lastForceFitNonce = forceFitNonce
+        let forceFit = forceFitNonce != coord.lastForceFitNonce || cropToggled
+        coord.lastForceFitNonce = forceFitNonce
 
-        if context.coordinator.fittedDocumentID != documentID {
-            scheduleInitialFit(scroll: scroll, coordinator: context.coordinator)
+        if coord.fittedDocumentID != documentID {
+            scheduleInitialFit(scroll: scroll, coordinator: coord)
         } else if forceFit {
-            DispatchQueue.main.async {
-                context.coordinator.userInteracted = false
-                applyInitialFit(scroll: scroll)
+            DispatchQueue.main.async { [weak coord] in
+                guard let coord else { return }
+                coord.userInteracted = false
+                coord.parent.applyInitialFit(scroll: scroll)
             }
         } else if viewportChanged {
             // SwiftUI told us the viewport changed (window resize, splitter drag).
-            DispatchQueue.main.async {
-                if alwaysRefitOnResize || !context.coordinator.userInteracted {
-                    if alwaysRefitOnResize {
-                        context.coordinator.userInteracted = false
+            DispatchQueue.main.async { [weak coord] in
+                guard let coord else { return }
+                let p = coord.parent
+                if p.alwaysRefitOnResize || !coord.userInteracted {
+                    if p.alwaysRefitOnResize {
+                        coord.userInteracted = false
                     }
-                    applyInitialFit(scroll: scroll)
+                    p.applyInitialFit(scroll: scroll)
                 } else {
-                    ensureImageVisible(scroll: scroll)
+                    Self.ensureImageVisible(scroll: scroll)
                 }
             }
         } else if abs(scroll.magnification - zoom) > 0.001 {
             scroll.magnification = zoom
-            context.coordinator.userInteracted = true
+            coord.userInteracted = true
+            canvas.needsDisplay = true
         }
     }
 
     private func scheduleInitialFit(scroll: NSScrollView, coordinator: Coordinator) {
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak coordinator] in
+            guard let coordinator else { return }
             let viewport = scroll.contentView.bounds.size
             if viewport.width < 2 || viewport.height < 2 {
                 // Layout not ready yet — retry on next runloop turn.
-                scheduleInitialFit(scroll: scroll, coordinator: coordinator)
+                coordinator.parent.scheduleInitialFit(scroll: scroll, coordinator: coordinator)
                 return
             }
-            applyInitialFit(scroll: scroll)
-            coordinator.fittedDocumentID = documentID
+            coordinator.parent.applyInitialFit(scroll: scroll)
+            coordinator.fittedDocumentID = coordinator.parent.documentID
         }
     }
 
-    private func canvasFrame(for image: NSImage, in viewport: CGSize) -> NSRect {
+    private static func canvasFrame(for image: NSImage, in viewport: CGSize) -> NSRect {
         let imgSize = image.size
         let pad = max(2000,
                       max(viewport.width, viewport.height) * 2,
@@ -783,7 +876,29 @@ struct ImageCanvasView: NSViewRepresentable {
         return NSRect(x: 0, y: 0, width: w, height: h)
     }
 
-    private func applyInitialFit(scroll: NSScrollView) {
+    private static func reframe(scroll: NSScrollView, canvas: NSView, for image: NSImage) {
+        let clip = scroll.contentView
+        let oldCenter = NSPoint(x: canvas.bounds.midX, y: canvas.bounds.midY)
+        let visibleCenter = NSPoint(x: clip.bounds.midX, y: clip.bounds.midY)
+        let offset = NSPoint(x: visibleCenter.x - oldCenter.x, y: visibleCenter.y - oldCenter.y)
+
+        let viewport = NSSize(width: scroll.frame.width / max(scroll.magnification, 0.0001),
+                              height: scroll.frame.height / max(scroll.magnification, 0.0001))
+        let cFrame = canvasFrame(for: image, in: viewport)
+        canvas.frame = cFrame
+        if let c = clip as? CanvasClipView {
+            updateImageRect(clipView: c, canvasFrame: cFrame, image: image)
+        }
+        let newCenter = NSPoint(x: cFrame.midX, y: cFrame.midY)
+        let size = clip.bounds.size
+        let origin = NSPoint(x: newCenter.x + offset.x - size.width / 2,
+                             y: newCenter.y + offset.y - size.height / 2)
+        let clamped = clip.constrainBoundsRect(NSRect(origin: origin, size: size))
+        clip.scroll(to: clamped.origin)
+        scroll.reflectScrolledClipView(clip)
+    }
+
+    fileprivate func applyInitialFit(scroll: NSScrollView) {
         let viewportPoints = scroll.frame.size
         let imgSize = image.size
         guard viewportPoints.width > 0, viewportPoints.height > 0,
@@ -820,9 +935,10 @@ struct ImageCanvasView: NSViewRepresentable {
         )
         scroll.contentView.scroll(to: origin)
         scroll.reflectScrolledClipView(scroll.contentView)
+        canvas.needsDisplay = true
     }
 
-    private func ensureImageVisible(scroll: NSScrollView) {
+    private static func ensureImageVisible(scroll: NSScrollView) {
         // With CanvasClipView's constrainBoundsRect, the image is always at
         // least minOverlap visible. Re-tickle the clipView so it re-clamps
         // its current origin under the new viewport size.
@@ -831,9 +947,9 @@ struct ImageCanvasView: NSViewRepresentable {
         scroll.reflectScrolledClipView(scroll.contentView)
     }
 
-    private func updateImageRect(clipView: CanvasClipView,
-                                  canvasFrame: NSRect,
-                                  image: NSImage) {
+    private static func updateImageRect(clipView: CanvasClipView,
+                                         canvasFrame: NSRect,
+                                         image: NSImage) {
         let imgSize = image.size
         clipView.imageRect = NSRect(
             x: (canvasFrame.width - imgSize.width) / 2,

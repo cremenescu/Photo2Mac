@@ -169,6 +169,21 @@ final class ImageRendererTests: XCTestCase {
         XCTAssertLessThan(argmaxBlue, 30, "Blue should peak near bottom")
     }
 
+    /// Core Image works in linear light; binning linear values put sRGB
+    /// mid-grey near bin 55 and made every histogram look underexposed.
+    func testHistogramBinsSRGBEncodedValues() throws {
+        let ctx = try XCTUnwrap(CGContext(
+            data: nil, width: 600, height: 400, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        ctx.setFillColor(CGColor(srgbRed: 128.0 / 255, green: 128.0 / 255, blue: 128.0 / 255, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: 600, height: 400))
+        let ci = CIImage(cgImage: try XCTUnwrap(ctx.makeImage()))
+        let h = try XCTUnwrap(HistogramComputer.compute(from: ci))
+        let peak = h.luminance.firstIndex(of: h.luminance.max() ?? 0) ?? -1
+        XCTAssertTrue((125...131).contains(peak), "mid-grey peaked at bin \(peak)")
+    }
+
     func testEditStackEquatable() {
         var a = EditStack()
         var b = EditStack()

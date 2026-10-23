@@ -36,9 +36,10 @@ final class PersistenceTests: XCTestCase {
 
     // MARK: - AutosaveStore
 
-    func testAutosaveSaveLoadRoundtrip() {
+    func testAutosaveSaveLoadRoundtrip() throws {
         let store = AutosaveStore()
-        let url = URL(fileURLWithPath: "/tmp/photo2mac-autosave-test-\(UUID().uuidString).png")
+        let url = try makeFixtureJPEG()
+        defer { try? FileManager.default.removeItem(at: url) }
         var s = EditStack()
         s.rotateDegrees = 90
         s.flipHorizontal = true
@@ -53,18 +54,46 @@ final class PersistenceTests: XCTestCase {
         XCTAssertFalse(store.exists(for: url))
     }
 
-    func testAutosaveDoesNotPersistNeutralStack() {
+    /// An autosave describes the pixels it was taken on. If the file changed
+    /// since (edited elsewhere, replaced, flattened by a save), applying it
+    /// would crop or rotate a different image.
+    func testAutosaveIsIgnoredOnceTheFileChanged() throws {
         let store = AutosaveStore()
-        let url = URL(fileURLWithPath: "/tmp/photo2mac-autosave-neutral-\(UUID().uuidString).png")
-        store.save(EditStack(), for: url)
-        XCTAssertFalse(store.exists(for: url),
-                       "Neutral stack should not create an autosave file")
+        let url = try makeFixtureJPEG()
+        defer { try? FileManager.default.removeItem(at: url); store.clear(for: url) }
+        var s = EditStack()
+        s.rotateDegrees = 90
+        store.save(s, for: url)
+        XCTAssertNotNil(store.load(for: url))
+
+        let other = try makeFixtureJPEG()
+        defer { try? FileManager.default.removeItem(at: other) }
+        var bytes = try Data(contentsOf: other)
+        bytes.append(contentsOf: [0, 0, 0, 0])
+        try bytes.write(to: url)
+        XCTAssertNil(store.load(for: url), "an autosave for a different version of the file was offered")
     }
 
-    func testAutosaveDifferentURLsAreIndependent() {
+    /// Autosaves from v0.2.1 and earlier carry no file identity and were taken
+    /// by versions that re-applied stacks to baked files; never offer them.
+    func testLegacyAutosaveIsIgnored() throws {
         let store = AutosaveStore()
-        let u1 = URL(fileURLWithPath: "/tmp/photo2mac-A-\(UUID().uuidString).png")
-        let u2 = URL(fileURLWithPath: "/tmp/photo2mac-B-\(UUID().uuidString).png")
+        let url = try makeFixtureJPEG()
+        defer { try? FileManager.default.removeItem(at: url); store.clear(for: url) }
+        var s = EditStack()
+        s.rotateDegrees = 90
+        try JSONEncoder().encode(s).write(to: store.file(for: url))
+        XCTAssertNil(store.load(for: url))
+    }
+
+    func testAutosaveDifferentURLsAreIndependent() throws {
+        let store = AutosaveStore()
+        let u1 = try makeFixtureJPEG()
+        let u2 = try makeFixtureJPEG()
+        defer {
+            try? FileManager.default.removeItem(at: u1)
+            try? FileManager.default.removeItem(at: u2)
+        }
         var s1 = EditStack(); s1.rotateDegrees = 90
         var s2 = EditStack(); s2.rotateDegrees = 270
         store.save(s1, for: u1)

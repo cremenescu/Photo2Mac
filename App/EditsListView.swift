@@ -104,7 +104,7 @@ struct EditsListView: View {
                 id: "rotate",
                 label: t("Rotire"),
                 detail: String(format: "%.2f°", s.rotateDegrees),
-                revert: { doc.commitChange { doc.stack.rotateDegrees = 0 } }
+                revert: { doc.commitChange { doc.stack.resetRotation() } }
             ))
         }
         if s.flipHorizontal {
@@ -112,7 +112,9 @@ struct EditsListView: View {
                 id: "flipH",
                 label: t("Flip orizontal"),
                 detail: t("Activ"),
-                revert: { doc.commitChange { doc.stack.flipHorizontal = false } }
+                revert: { doc.commitChange {
+                    doc.stack.toggleSourceFlip(horizontal: true, sourceSize: doc.originalImage.size)
+                } }
             ))
         }
         if s.flipVertical {
@@ -120,7 +122,9 @@ struct EditsListView: View {
                 id: "flipV",
                 label: t("Flip vertical"),
                 detail: t("Activ"),
-                revert: { doc.commitChange { doc.stack.flipVertical = false } }
+                revert: { doc.commitChange {
+                    doc.stack.toggleSourceFlip(horizontal: false, sourceSize: doc.originalImage.size)
+                } }
             ))
         }
         if s.adjustments.brightness != 0 {
@@ -153,6 +157,17 @@ struct EditsListView: View {
                 label: t("Expunere"),
                 detail: String(format: "%+.2f EV", s.adjustments.exposure),
                 revert: { doc.commitChange { doc.stack.adjustments.exposure = 0 } }
+            ))
+        }
+        if let r = s.resize {
+            let out2 = EditGeometry.outputSize(for: s, sourceSize: doc.originalImage.size)
+            out.append(EditEntry(
+                id: "resize",
+                label: t("Redimensionare"),
+                detail: r.keepsAspect
+                    ? "\(Int(out2.width)) × \(Int(out2.height)) px"
+                    : "\(r.width) × \(r.height) px",
+                revert: { doc.commitChange { doc.stack.resize = nil } }
             ))
         }
         return out

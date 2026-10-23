@@ -15,8 +15,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: NSWindow.didBecomeKeyNotification,
             object: nil, queue: .main
         ) { note in
-            (note.object as? NSWindow)?.tabbingMode = .disallowed
+            guard let window = note.object as? NSWindow else { return }
+            window.tabbingMode = .disallowed
+            if window.title == "Photo2Mac" { WindowCloseGuard.install(on: window) }
         }
+    }
+
+    /// Cmd+Q (and the quit that follows closing the window) with unsaved
+    /// edits asks first.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        WorkspaceHolder.shared.workspace.resolveUnsaved() ? .terminateNow : .terminateCancel
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -75,6 +83,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// Asks about unsaved edits before the main window closes.
+///
+/// SwiftUI owns the window's delegate, so this one sits in front of it and
+/// forwards everything else. Without it the red close button would close the
+/// window first and only then ask, from a quit that can no longer bring the
+/// window back.
+final class WindowCloseGuard: NSObject, NSWindowDelegate {
+    private weak var inner: NSWindowDelegate?
+    private static var guards: [ObjectIdentifier: WindowCloseGuard] = [:]
+
+    static func install(on window: NSWindow) {
+        guard !(window.delegate is WindowCloseGuard) else { return }
+        let g = WindowCloseGuard()
+        g.inner = window.delegate
+        guards[ObjectIdentifier(window)] = g
+        window.delegate = g
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard WorkspaceHolder.shared.workspace.resolveUnsaved() else { return false }
+        return inner?.windowShouldClose?(sender) ?? true
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        inner?.windowWillClose?(notification)
+        if let w = notification.object as? NSWindow {
+            Self.guards[ObjectIdentifier(w)] = nil
+        }
+    }
+
+    override func responds(to aSelector: Selector!) -> Bool {
+        super.responds(to: aSelector) || (inner?.responds(to: aSelector) ?? false)
+    }
+
+    override func forwardingTarget(for aSelector: Selector!) -> Any? {
+        if let inner, inner.responds(to: aSelector) { return inner }
+        return super.forwardingTarget(for: aSelector)
+    }
+}
+
 /// Singleton bridge so AppDelegate can reach the Workspace.
 final class WorkspaceHolder {
     static let shared = WorkspaceHolder()
@@ -116,6 +164,35 @@ struct SaveCommands: Commands {
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
             .disabled(workspace.selected == nil)
+
+            Button(t("Exporta...")) {
+                NotificationCenter.default.post(name: .photo2MacDismissPopovers, object: nil)
+                if let doc = workspace.selected {
+                    _ = SaveService.export(doc: doc)
+                }
+            }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
+            .disabled(workspace.selected == nil)
+        }
+    }
+}
+
+struct NavigationCommands: Commands {
+    @ObservedObject private var workspace = WorkspaceHolder.shared.workspace
+
+    var body: some Commands {
+        CommandGroup(before: .toolbar) {
+            Button(t("Imaginea anterioara din dosar")) {
+                workspace.openSibling(offset: -1)
+            }
+            .keyboardShortcut("[", modifiers: [.command])
+            .disabled(workspace.selected == nil)
+            Button(t("Imaginea urmatoare din dosar")) {
+                workspace.openSibling(offset: 1)
+            }
+            .keyboardShortcut("]", modifiers: [.command])
+            .disabled(workspace.selected == nil)
+            Divider()
         }
     }
 }
@@ -181,6 +258,7 @@ struct Photo2MacApp: App {
                 .keyboardShortcut("w", modifiers: [.command, .shift])
             }
             SaveCommands()
+            NavigationCommands()
             PreferencesCommand()
             UndoRedoCommands()
             AboutHelpCommands()

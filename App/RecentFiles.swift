@@ -37,6 +37,12 @@ final class RecentFiles: ObservableObject {
         persist()
     }
 
+    func remove(_ url: URL) {
+        guard urls.contains(url) else { return }
+        urls.removeAll { $0 == url }
+        persist()
+    }
+
     func clear() {
         urls.removeAll()
         persist()

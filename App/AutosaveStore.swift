@@ -37,27 +37,47 @@ final class AutosaveStore {
         FileManager.default.fileExists(atPath: file(for: url).path)
     }
 
-    func mtime(for url: URL) -> Date? {
-        let attrs = try? FileManager.default.attributesOfItem(
-            atPath: file(for: url).path)
-        return attrs?[.modificationDate] as? Date
+    /// What is stored: the stack, plus the identity of the file it was
+    /// taken against. A stack only describes the pixels it was made on; if the
+    /// file was replaced, edited elsewhere or flattened since, applying it
+    /// would crop or rotate a different image.
+    struct Payload: Codable {
+        var version: Int = 2
+        var stack: EditStack
+        var fileSize: Int?
+        var fileModified: Date?
     }
 
+    static func identity(of url: URL) -> (size: Int?, modified: Date?) {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return (attrs?[.size] as? Int, attrs?[.modificationDate] as? Date)
+    }
+
+    /// The autosaved stack for `url`, or nil when there is none or it was
+    /// taken against a different version of the file.
+    ///
+    /// Autosaves written before v0.3.0 carry no identity and are ignored: the
+    /// versions that wrote them re-applied stacks onto already-edited files,
+    /// so they cannot be trusted to describe the pixels on disk.
     func load(for url: URL) -> EditStack? {
         let f = file(for: url)
-        guard let data = try? Data(contentsOf: f) else { return nil }
-        return try? JSONDecoder().decode(EditStack.self, from: data)
+        guard let data = try? Data(contentsOf: f),
+              let payload = try? JSONDecoder().decode(Payload.self, from: data),
+              payload.version >= 2
+        else { return nil }
+        let now = Self.identity(of: url)
+        guard let size = payload.fileSize, size == now.size,
+              let then = payload.fileModified, let mod = now.modified,
+              abs(then.timeIntervalSince(mod)) < 1
+        else { return nil }
+        return payload.stack
     }
 
     func save(_ stack: EditStack, for url: URL) {
-        let f = file(for: url)
-        if stack.isNeutral {
-            // Nothing to remember = no autosave file.
-            clear(for: url)
-            return
-        }
-        guard let data = try? JSONEncoder().encode(stack) else { return }
-        try? data.write(to: f, options: .atomic)
+        let id = Self.identity(of: url)
+        let payload = Payload(stack: stack, fileSize: id.size, fileModified: id.modified)
+        guard let data = try? JSONEncoder().encode(payload) else { return }
+        try? data.write(to: file(for: url), options: .atomic)
     }
 
     func clear(for url: URL) {

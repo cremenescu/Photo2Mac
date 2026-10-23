@@ -33,9 +33,33 @@ public struct Histogram: Equatable {
 
 public enum HistogramComputer {
 
+    /// Long side of the image the histogram is computed from. The shape of a
+    /// histogram does not change with resolution, the cost does.
+    static let sampleSide: CGFloat = 512
+
+    /// Histogram of what an NSImage looks like on screen. Safe off the main
+    /// thread.
+    public static func compute(for image: NSImage) -> Histogram {
+        guard let ci = ImageRenderer.makeCIImage(from: image) else { return .empty }
+        return compute(from: ci) ?? .empty
+    }
+
     /// Compute 256-bin histograms (R/G/B + luminance) from a CIImage.
     /// Returns nil on failure.
-    public static func compute(from image: CIImage, binCount: Int = 256) -> Histogram? {
+    ///
+    /// Binned on sRGB-ENCODED values, like every photo editor: Core Image
+    /// works in linear light, and a histogram of linear values piles a
+    /// correctly exposed photo into the left third — mid-grey 128 lands near
+    /// bin 55 — so the graph looks underexposed when the image is not.
+    public static func compute(from source: CIImage, binCount: Int = 256) -> Histogram? {
+        var image = source
+        let ext = image.extent
+        let longSide = max(ext.width, ext.height)
+        if longSide > sampleSide {
+            let k = sampleSide / longSide
+            image = image.transformed(by: CGAffineTransform(scaleX: k, y: k))
+        }
+        image = image.applyingFilter("CILinearToSRGBToneCurve")
         guard let rgb = areaHistogram(of: image, binCount: binCount) else { return nil }
 
         // Convert to luma via CIColorMatrix using Rec. 709 coefficients,

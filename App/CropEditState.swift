@@ -4,6 +4,7 @@
 import Foundation
 import CoreGraphics
 import AppKit
+import CoreImage
 
 enum CropAspect: String, CaseIterable, Identifiable {
     // Order matters: this is the order shown in the picker.
@@ -45,8 +46,13 @@ enum CropAspect: String, CaseIterable, Identifiable {
 
 /// Live state of the crop tool while user is dragging handles.
 /// `rect` is in IMAGE PIXEL coordinates of the IMAGE SHOWN WHILE EDITING —
-/// which has flip + rotate applied (so cropping happens on what the user sees
-/// after orientation changes), but NOT crop or adjustments-after-crop.
+/// which has flip + rotate + adjustments applied (so cropping happens on what
+/// the user sees after orientation changes), but neither the crop nor the
+/// final resize.
+///
+/// The document's stack is NOT touched while the tool is open: it keeps its
+/// current crop until Apply, so saving or autosaving mid-crop writes the crop
+/// the user already has instead of silently dropping it.
 final class CropEditState: ObservableObject {
     @Published var rect: CGRect
     @Published var aspect: CropAspect = .original {
@@ -56,36 +62,55 @@ final class CropEditState: ObservableObject {
             }
         }
     }
-    /// The crop that was in `doc.stack.crop` when the user entered crop mode.
-    /// On Cancel we restore this; on Apply we replace with `rect` normalized.
-    let originalStackCrop: CropRect?
+    /// The crop in effect when the tool was opened, as it maps onto the
+    /// current rotation; nil when the image was not cropped.
+    let initialCrop: CropRect?
     /// Size of the image shown while editing (post-rotate / post-flip).
     let imageSize: CGSize
-    /// Image to display behind the crop overlay. Reflects the stack with
-    /// crop temporarily disabled, so the user can pick a new crop region on
-    /// the already-rotated / already-adjusted image.
+    /// Image to display behind the crop overlay.
     let preCropImage: NSImage
 
-    init(doc: OpenImage) {
-        // Render the image with crop disabled but every other operation
-        // (flip, rotate, adjustments) applied. This is what the user sees
-        // while choosing a new crop region.
-        var without = doc.stack
-        without.crop = nil
-        let pre = ImageRenderer.render(original: doc.originalImage,
-                                         sourceCI: doc.sourceCIImage,
-                                         stack: without)
-        self.preCropImage = pre
-        self.imageSize = pre.size
-        self.originalStackCrop = doc.stack.crop
-        if let c = doc.stack.crop {
-            self.rect = CGRect(x: c.x * pre.size.width,
-                               y: c.y * pre.size.height,
-                               width: c.width * pre.size.width,
-                               height: c.height * pre.size.height)
+    init(preCropImage: NSImage, initialCrop: CropRect?) {
+        let size = preCropImage.size
+        self.preCropImage = preCropImage
+        self.imageSize = size
+        self.initialCrop = initialCrop
+        if let c = initialCrop {
+            self.rect = CGRect(x: c.x * size.width,
+                               y: c.y * size.height,
+                               width: c.width * size.width,
+                               height: c.height * size.height)
         } else {
-            self.rect = CGRect(origin: .zero, size: pre.size)
+            self.rect = CGRect(origin: .zero, size: size)
         }
+    }
+
+    /// Render what the crop tool shows for `stack`. Slow for large photos;
+    /// call it off the main thread.
+    static func make(stack: EditStack, original: NSImage, sourceCI: CIImage?) -> CropEditState {
+        var without = stack
+        without.crop = nil
+        without.resize = nil
+        let pre = ImageRenderer.render(original: original, sourceCI: sourceCI, stack: without)
+        let initial = EditGeometry.effectiveCrop(for: stack, sourceSize: original.size)
+        return CropEditState(preCropImage: pre, initialCrop: initial)
+    }
+
+    /// True when the rect covers the whole image, i.e. applying it means
+    /// "no crop".
+    var coversWholeImage: Bool {
+        let n = normalized
+        return abs(n.x) < 0.001 && abs(n.y) < 0.001
+            && abs(n.width - 1) < 0.001 && abs(n.height - 1) < 0.001
+    }
+
+    /// Whether the rect differs from the crop the tool was opened with.
+    var hasChanges: Bool {
+        let n = normalized
+        let base = initialCrop ?? CropRect(x: 0, y: 0, width: 1, height: 1)
+        let eps = 0.001
+        return abs(n.x - base.x) > eps || abs(n.y - base.y) > eps
+            || abs(n.width - base.width) > eps || abs(n.height - base.height) > eps
     }
 
     /// Normalized to image (0...1).

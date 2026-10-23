@@ -285,6 +285,11 @@ enum XMPStack {
         if adj.exposure != 0 {
             parts.append(String(format: "exposure %+.2f EV", adj.exposure))
         }
+        if let r = s.resize {
+            parts.append(r.keepsAspect
+                         ? "resize to fit \(r.width)×\(r.height) px"
+                         : "resize to \(r.width)×\(r.height) px")
+        }
         return "\(creator) — " + parts.joined(separator: ", ")
     }
 

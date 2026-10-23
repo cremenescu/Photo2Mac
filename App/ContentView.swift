@@ -5,7 +5,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum EditorTool: String, CaseIterable, Identifiable {
-    case hand, crop, rotate, tune, text, arrow, rect, blur, info
+    // Annotation tools (text, arrow, rectangle, blur) come after v0.3.0; their
+    // icons stay in the bundle, but there is no tool to show until they work.
+    case hand, crop, rotate, tune, resize, info
     var id: String { rawValue }
     var iconName: String { rawValue }
     var label: String {
@@ -14,10 +16,7 @@ enum EditorTool: String, CaseIterable, Identifiable {
         case .crop: return t("Decupare")
         case .rotate: return t("Rotire")
         case .tune: return t("Ajustari")
-        case .text: return t("Text")
-        case .arrow: return t("Sageata")
-        case .rect: return t("Dreptunghi")
-        case .blur: return t("Blur")
+        case .resize: return t("Redimensionare")
         case .info: return t("Metadate")
         }
     }
@@ -26,11 +25,9 @@ enum EditorTool: String, CaseIterable, Identifiable {
 struct WorkspaceView: View {
     @EnvironmentObject var workspace: Workspace
     @ObservedObject private var settings = AppSettings.shared
-    @State private var tool: EditorTool = .hand
     @State private var zoom: CGFloat = 1.0
     @State private var showInspector: Bool = true
     @State private var forceFitNonce: Int = 0
-    @StateObject private var cropEdit = CropEditHolder()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,11 +46,11 @@ struct WorkspaceView: View {
                             CanvasContainer(doc: doc,
                                             zoom: $zoom,
                                             initialZoomMode: settings.initialZoomMode,
-                                            tool: tool,
+                                            tool: workspace.tool,
+                                            comparing: workspace.comparing,
                                             viewportSize: proxy.size,
                                             forceFitNonce: forceFitNonce,
-                                            alwaysRefitOnResize: settings.alwaysRefitOnResize,
-                                            cropEditState: cropEdit.state)
+                                            alwaysRefitOnResize: settings.alwaysRefitOnResize)
                         } else {
                             EmptyWorkspaceView()
                         }
@@ -63,26 +60,13 @@ struct WorkspaceView: View {
                 .layoutPriority(1)
 
                 if showInspector {
-                    InspectorView(tool: $tool, cropHolder: cropEdit, zoom: $zoom)
+                    InspectorView(zoom: $zoom)
                         .frame(minWidth: 200, idealWidth: 260, maxWidth: 360)
                 }
             }
         }
         .onOpenURL { url in
             workspace.open(url: url)
-        }
-        .onChange(of: tool) { oldTool, newTool in
-            // Leaving crop tool without explicit Apply/Cancel = cancel (revert).
-            if newTool != .crop, let s = cropEdit.state,
-               let doc = workspace.selected {
-                doc.stack.crop = s.originalStackCrop
-                cropEdit.state = nil
-            }
-            // Re-fit on crop entry/exit (entering = 90% fit so corner handles
-            // are reachable; leaving = back to normal fit).
-            if oldTool == .crop || newTool == .crop {
-                forceFitNonce &+= 1
-            }
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             for p in providers {
@@ -98,10 +82,10 @@ struct WorkspaceView: View {
             ToolbarItemGroup(placement: .navigation) {
                 ForEach(EditorTool.allCases) { t in
                     Button {
-                        tool = t
+                        workspace.tool = t
                     } label: {
                         IconifyImage(name: t.iconName, size: 18)
-                            .foregroundStyle(tool == t ? Color.accentColor : Color.primary)
+                            .foregroundStyle(workspace.tool == t ? Color.accentColor : Color.primary)
                     }
                     .help(t.label)
                     .disabled(workspace.selected == nil && t != .hand)
@@ -111,6 +95,7 @@ struct WorkspaceView: View {
 
                 UndoRedoButtons(doc: workspace.selected)
                 EditsListButton(doc: workspace.selected)
+                CompareButton(doc: workspace.selected)
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -258,22 +243,23 @@ private struct UndoRedoButtonsActive: View {
 }
 
 struct CanvasContainer: View {
+    @EnvironmentObject var workspace: Workspace
     @ObservedObject var doc: OpenImage
     @Binding var zoom: CGFloat
     let initialZoomMode: InitialZoom
     let tool: EditorTool
+    let comparing: Bool
     let viewportSize: CGSize
     let forceFitNonce: Int
     let alwaysRefitOnResize: Bool
-    let cropEditState: CropEditState?
 
-    /// When crop tool is active, show the image with flip/rotate/adjustments
-    /// applied but crop temporarily disabled — so the user picks a fresh crop
-    /// region on the ALREADY ROTATED / FLIPPED image, not on the raw original.
-    /// When Apply commits, the new crop replaces stack.crop and the renderer
-    /// re-applies it on top of rotate/flip.
+    /// While cropping, the canvas shows the image with flip/rotate/adjustments
+    /// applied but the crop left out, so a new region is picked on the
+    /// ALREADY ROTATED / FLIPPED image. Holding "before/after" shows the
+    /// untouched original instead.
     private var imageToShow: NSImage {
-        if let s = cropEditState { return s.preCropImage }
+        if comparing { return doc.originalImage }
+        if let s = doc.cropEdit { return s.preCropImage }
         return doc.displayImage
     }
 
@@ -286,14 +272,56 @@ struct CanvasContainer: View {
                         viewportSize: viewportSize,
                         forceFitNonce: forceFitNonce,
                         alwaysRefitOnResize: alwaysRefitOnResize,
-                        cropEditState: cropEditState,
+                        cropEditState: comparing ? nil : doc.cropEdit,
                         onRotate: { delta in
                             // Trackpad rotate (Rotate tool only): accumulate
                             // into the live angle, clamped, rounded to 0.01°.
                             let r = max(-180, min(180,
                                 doc.stack.rotateDegrees + Double(delta)))
                             doc.stack.rotateDegrees = (r * 100).rounded() / 100
+                        },
+                        onKey: { key in
+                            switch key {
+                            case .apply:
+                                guard tool == .crop || tool == .rotate
+                                        || tool == .tune || tool == .resize else { return false }
+                                workspace.applyTool()
+                            case .cancel:
+                                guard tool != .hand else { return false }
+                                workspace.cancelTool()
+                            case .previous:
+                                workspace.openSibling(offset: -1)
+                            case .next:
+                                workspace.openSibling(offset: 1)
+                            case .compare(let down):
+                                workspace.comparing = down
+                            }
+                            return true
                         })
+    }
+}
+
+/// Press and hold to see the original; release to return to the edit.
+struct CompareButton: View {
+    @EnvironmentObject var workspace: Workspace
+    let doc: OpenImage?
+
+    var body: some View {
+        IconifyImage(name: "compare", size: 18)
+            .foregroundStyle(workspace.comparing ? Color.accentColor : Color.primary)
+            .frame(width: 28, height: 22)
+            .contentShape(Rectangle())
+            .opacity(doc == nil ? 0.35 : 1)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        if doc != nil, !workspace.comparing { workspace.comparing = true }
+                    }
+                    .onEnded { _ in workspace.comparing = false }
+            )
+            .help(t("Tine apasat pentru original (sau tasta \\)"))
+            .accessibilityLabel(t("Inainte / dupa"))
+            .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -319,12 +347,17 @@ struct TabBarView: View {
 
 struct TabItemView: View {
     @EnvironmentObject var workspace: Workspace
-    let doc: OpenImage
+    @ObservedObject var doc: OpenImage
     let selected: Bool
     @State private var hovering = false
 
     var body: some View {
         HStack(spacing: 6) {
+            // Unsaved edits, as in the Finder-style document close buttons.
+            Circle()
+                .fill(doc.isDirty ? Color.primary.opacity(0.7) : Color.clear)
+                .frame(width: 6, height: 6)
+                .accessibilityLabel(doc.isDirty ? t("Modificari nesalvate") : "")
             Text(doc.displayName)
                 .font(.system(size: 12))
                 .lineLimit(1)
@@ -534,11 +567,10 @@ struct RecentRow: View {
 
 struct InspectorView: View {
     @EnvironmentObject var workspace: Workspace
-    @Binding var tool: EditorTool
-    let cropHolder: CropEditHolder
     @Binding var zoom: CGFloat
 
     var body: some View {
+        let tool = workspace.tool
         VStack(alignment: .leading, spacing: 12) {
             Text(tool.label)
                 .font(.headline)
@@ -553,7 +585,7 @@ struct InspectorView: View {
                         .font(.callout)
                 case .tune:
                     if let doc = workspace.selected {
-                        TuneInspector(doc: doc, tool: $tool)
+                        TuneInspector(doc: doc)
                     } else {
                         Text(t("Deschide o imagine pentru a ajusta."))
                             .foregroundStyle(.secondary)
@@ -561,7 +593,7 @@ struct InspectorView: View {
                     }
                 case .rotate:
                     if let doc = workspace.selected {
-                        RotateInspector(doc: doc, tool: $tool, zoom: $zoom)
+                        RotateInspector(doc: doc, zoom: $zoom)
                     } else {
                         Text(t("Deschide o imagine pentru rotire."))
                             .foregroundStyle(.secondary)
@@ -569,9 +601,17 @@ struct InspectorView: View {
                     }
                 case .crop:
                     if let doc = workspace.selected {
-                        CropInspector(doc: doc, holder: cropHolder, tool: $tool)
+                        CropInspector(doc: doc)
                     } else {
                         Text(t("Deschide o imagine pentru decupare."))
+                            .foregroundStyle(.secondary)
+                            .font(.callout)
+                    }
+                case .resize:
+                    if let doc = workspace.selected {
+                        ResizeInspector(doc: doc)
+                    } else {
+                        Text(t("Deschide o imagine pentru redimensionare."))
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     }
@@ -583,10 +623,6 @@ struct InspectorView: View {
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     }
-                default:
-                    Text("Parametri \(tool.label) — in dezvoltare")
-                        .foregroundStyle(.secondary)
-                        .font(.callout)
                 }
             }
 
@@ -609,6 +645,7 @@ struct InspectorView: View {
                     Text("\(Int(doc.originalImage.size.width)) x \(Int(doc.originalImage.size.height)) px")
                         .font(.callout)
                         .monospacedDigit()
+                    OutputSizeRow(doc: doc)
                 }
             }
         }
@@ -734,13 +771,6 @@ struct MetadataInspector: View {
     }
 }
 
-/// Holds the currently-active crop edit state for the workspace.
-/// Lives at WorkspaceView scope so tool switches outside crop tool don't drop
-/// the state (we just hide the overlay).
-final class CropEditHolder: ObservableObject {
-    @Published var state: CropEditState?
-}
-
 struct AspectPicker: View {
     @ObservedObject var state: CropEditState
 
@@ -764,9 +794,8 @@ struct AspectPicker: View {
 }
 
 private struct CropInspectorActive: View {
+    @EnvironmentObject var workspace: Workspace
     @ObservedObject var state: CropEditState
-    let onApply: () -> Void
-    let onCancel: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -786,12 +815,12 @@ private struct CropInspectorActive: View {
             Divider().padding(.vertical, 4)
 
             HStack {
-                Button(t("Anuleaza")) { onCancel() }
+                Button(t("Anuleaza")) { workspace.cancelTool() }
                 Spacer()
-                Button(t("Aplica")) { onApply() }
+                Button(t("Aplica")) { workspace.applyTool() }
                     .keyboardShortcut(.return, modifiers: [])
                     .buttonStyle(.borderedProminent)
-                    .disabled(!hasPendingChanges)
+                    .disabled(!state.hasChanges)
             }
 
             Button {
@@ -805,25 +834,10 @@ private struct CropInspectorActive: View {
             .padding(.top, 4)
         }
     }
-
-    /// Apply enabled only when the crop rect differs from where it was when
-    /// the user entered the tool (or "full image" if no prior crop).
-    private var hasPendingChanges: Bool {
-        let n = state.normalized
-        let base: CropRect = state.originalStackCrop
-            ?? CropRect(x: 0, y: 0, width: 1, height: 1)
-        let eps = 0.001
-        return abs(n.x - base.x) > eps
-            || abs(n.y - base.y) > eps
-            || abs(n.width - base.width) > eps
-            || abs(n.height - base.height) > eps
-    }
 }
 
 struct CropInspector: View {
     @ObservedObject var doc: OpenImage
-    @ObservedObject var holder: CropEditHolder
-    @Binding var tool: EditorTool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -831,70 +845,23 @@ struct CropInspector: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
-            if let state = holder.state {
+            if let state = doc.cropEdit {
                 // Sub-view observes state directly so rect/aspect changes
                 // refresh the Apply disabled state and rect readout live.
-                CropInspectorActive(state: state,
-                                     onApply: applyCrop,
-                                     onCancel: cancelCrop)
+                CropInspectorActive(state: state)
+            } else {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .onAppear {
-            ensureCropState()
-        }
-    }
-
-    private func ensureCropState() {
-        if holder.state == nil {
-            // Renders the post-flip/post-rotate/post-adjustments image (with
-            // crop disabled) so the user can crop on what they SEE — including
-            // any rotation they already applied.
-            holder.state = CropEditState(doc: doc)
-            doc.stack.crop = nil
-        }
-    }
-
-    private func applyCrop() {
-        guard let s = holder.state else { return }
-        // The original-stack snapshot was taken when entering crop mode
-        // (ensureCropState already cleared doc.stack.crop). We push that
-        // pre-edit snapshot so undo restores the prior crop (or no crop).
-        let snapshot = preCropStack(originalCrop: s.originalStackCrop)
-        let n = s.normalized
-        if abs(n.x) < 0.001 && abs(n.y) < 0.001 &&
-            abs(n.width - 1) < 0.001 && abs(n.height - 1) < 0.001 {
-            doc.stack.crop = nil
-        } else {
-            doc.stack.crop = n
-        }
-        doc.commitSnapshot(snapshot)
-        holder.state = nil
-        tool = .hand
-    }
-
-    private func cancelCrop() {
-        // No history push: Cancel reverts the temp edit and leaves stack as
-        // it was when the user entered crop mode.
-        if let s = holder.state {
-            doc.stack.crop = s.originalStackCrop
-        }
-        holder.state = nil
-        tool = .hand
-    }
-
-    /// Pre-edit stack = current stack with crop restored to the original value.
-    private func preCropStack(originalCrop: CropRect?) -> EditStack {
-        var s = doc.stack
-        s.crop = originalCrop
-        return s
     }
 }
 
 struct RotateInspector: View {
+    @EnvironmentObject var workspace: Workspace
     @ObservedObject var doc: OpenImage
-    @Binding var tool: EditorTool
     @Binding var zoom: CGFloat
-    @State private var preToolSnap: EditStack?
 
     private static let formatter: NumberFormatter = {
         let f = NumberFormatter()
@@ -910,7 +877,7 @@ struct RotateInspector: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Button {
-                    rotate(by: -90)
+                    doc.stack.rotateQuarter(clockwise: false)
                 } label: {
                     Label { Text("-90°") } icon: {
                         IconifyImage(name: "rotate-left", size: 16)
@@ -918,7 +885,7 @@ struct RotateInspector: View {
                     .labelStyle(.titleAndIcon)
                 }
                 Button {
-                    rotate(by: 90)
+                    doc.stack.rotateQuarter(clockwise: true)
                 } label: {
                     Label { Text("+90°") } icon: {
                         IconifyImage(name: "rotate-right", size: 16)
@@ -963,7 +930,7 @@ struct RotateInspector: View {
 
             HStack(spacing: 8) {
                 Button {
-                    doc.stack.flipHorizontal.toggle()
+                    doc.stack.flipDisplayHorizontal()
                 } label: {
                     Label { Text(t("Orizontal")) } icon: {
                         IconifyImage(name: "flip-h", size: 16)
@@ -975,7 +942,7 @@ struct RotateInspector: View {
                         .fill(doc.stack.flipHorizontal ? Color.accentColor.opacity(0.18) : Color.clear)
                 )
                 Button {
-                    doc.stack.flipVertical.toggle()
+                    doc.stack.flipDisplayVertical()
                 } label: {
                     Label { Text(t("Vertical")) } icon: {
                         IconifyImage(name: "flip-v", size: 16)
@@ -1014,18 +981,16 @@ struct RotateInspector: View {
             Divider().padding(.vertical, 4)
 
             HStack {
-                Button(t("Anuleaza")) { cancel() }
+                Button(t("Anuleaza")) { workspace.cancelTool() }
                 Spacer()
-                Button(t("Aplica")) { apply() }
+                Button(t("Aplica")) { workspace.applyTool() }
                     .keyboardShortcut(.return, modifiers: [])
                     .buttonStyle(.borderedProminent)
-                    .disabled(!hasPendingChanges)
+                    .disabled(!doc.sessionHasChanges)
             }
 
             Button {
-                doc.stack.rotateDegrees = 0
-                doc.stack.flipHorizontal = false
-                doc.stack.flipVertical = false
+                doc.stack.resetGeometry()
             } label: {
                 Text(t("Reseteaza rotire / flip"))
                     .frame(maxWidth: .infinity)
@@ -1069,43 +1034,6 @@ struct RotateInspector: View {
                 }
             }
         }
-        .onAppear {
-            if preToolSnap == nil { preToolSnap = doc.stack }
-        }
-        .onDisappear {
-            if let snap = preToolSnap, snap != doc.stack {
-                doc.commitSnapshot(snap)
-            }
-            preToolSnap = nil
-        }
-    }
-
-    private var hasPendingChanges: Bool {
-        guard let snap = preToolSnap else { return false }
-        return snap != doc.stack
-    }
-
-    private func apply() {
-        if let snap = preToolSnap, snap != doc.stack {
-            doc.commitSnapshot(snap)
-        }
-        preToolSnap = nil
-        tool = .hand
-    }
-
-    private func cancel() {
-        if let snap = preToolSnap {
-            doc.stack = snap
-        }
-        preToolSnap = nil
-        tool = .hand
-    }
-
-    private func rotate(by delta: Double) {
-        var r = doc.stack.rotateDegrees + delta
-        while r > 180 { r -= 360 }
-        while r <= -180 { r += 360 }
-        doc.stack.rotateDegrees = r
     }
 
     /// Incremental nudge from the stepper arrows. Clamps to [-180, 180]
@@ -1190,9 +1118,8 @@ struct HoldRepeatButton: View {
 }
 
 struct TuneInspector: View {
+    @EnvironmentObject var workspace: Workspace
     @ObservedObject var doc: OpenImage
-    @Binding var tool: EditorTool
-    @State private var preToolSnap: EditStack?
     @State private var histogramMode: HistogramMode = .rgb
 
     var body: some View {
@@ -1213,8 +1140,7 @@ struct TuneInspector: View {
                     .pickerStyle(.menu)
                     .frame(width: 130)
                 }
-                HistogramView(histogram: histogram(for: doc.displayImage),
-                              mode: histogramMode)
+                HistogramView(histogram: doc.histogram, mode: histogramMode)
             }
             Divider().padding(.vertical, 2)
 
@@ -1255,12 +1181,12 @@ struct TuneInspector: View {
             Divider().padding(.vertical, 4)
 
             HStack {
-                Button(t("Anuleaza")) { cancel() }
+                Button(t("Anuleaza")) { workspace.cancelTool() }
                 Spacer()
-                Button(t("Aplica")) { apply() }
+                Button(t("Aplica")) { workspace.applyTool() }
                     .keyboardShortcut(.return, modifiers: [])
                     .buttonStyle(.borderedProminent)
-                    .disabled(!hasPendingChanges)
+                    .disabled(!doc.sessionHasChanges)
             }
 
             Button {
@@ -1272,45 +1198,229 @@ struct TuneInspector: View {
             .disabled(doc.stack.adjustments.isNeutral)
             .padding(.top, 4)
         }
-        .onAppear {
-            if preToolSnap == nil { preToolSnap = doc.stack }
-        }
-        .onDisappear {
-            // User left the tool without explicit Apply/Cancel: implicit apply
-            // so their edits survive in history.
-            if let snap = preToolSnap, snap != doc.stack {
-                doc.commitSnapshot(snap)
+    }
+
+}
+
+/// Final size of the image. Writes `EditStack.resize` live; the tool session
+/// turns the whole visit into one undo step.
+struct ResizeInspector: View {
+    @EnvironmentObject var workspace: Workspace
+    @ObservedObject var doc: OpenImage
+    @State private var usePercent = false
+
+    private static let pixelFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .none
+        f.minimum = 1
+        f.maximum = 100_000
+        f.allowsFloats = false
+        return f
+    }()
+
+    private static let percentFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.minimum = 1
+        f.maximum = 1000
+        f.maximumFractionDigits = 1
+        f.usesGroupingSeparator = false
+        return f
+    }()
+
+    /// The image as the stack produces it before resizing.
+    private var base: CGSize {
+        EditGeometry.sizeBeforeResize(for: doc.stack, sourceSize: doc.originalImage.size)
+    }
+
+    private var output: CGSize {
+        EditGeometry.outputSize(for: doc.stack, sourceSize: doc.originalImage.size)
+    }
+
+    private var keepsAspect: Bool { doc.stack.resize?.keepsAspect ?? true }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Picker("", selection: $usePercent) {
+                Text(t("Pixeli")).tag(false)
+                Text(t("Procent")).tag(true)
             }
-            preToolSnap = nil
+            .pickerStyle(.segmented)
+            .labelsHidden()
+
+            if usePercent {
+                HStack {
+                    Text(t("Scara"))
+                        .font(.callout)
+                    Spacer()
+                    TextField("", value: Binding(
+                        get: { base.width > 0 ? Double(output.width / base.width * 100) : 100 },
+                        set: { setPercent($0) }
+                    ), formatter: Self.percentFormatter)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 72)
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    Text(verbatim: "%")
+                }
+            } else {
+                HStack(spacing: 6) {
+                    Text(t("Latime"))
+                        .font(.callout)
+                    Spacer()
+                    TextField("", value: Binding(
+                        get: { Int(output.width) },
+                        set: { setWidth($0) }
+                    ), formatter: Self.pixelFormatter)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 72)
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    Text(verbatim: "px")
+                }
+                HStack(spacing: 6) {
+                    Text(t("Inaltime"))
+                        .font(.callout)
+                    Spacer()
+                    TextField("", value: Binding(
+                        get: { Int(output.height) },
+                        set: { setHeight($0) }
+                    ), formatter: Self.pixelFormatter)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 72)
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    Text(verbatim: "px")
+                }
+                Toggle(t("Pastreaza proportiile"), isOn: Binding(
+                    get: { keepsAspect },
+                    set: { setKeepsAspect($0) }
+                ))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(t("Latura lunga"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    ForEach([1920, 1200, 800], id: \.self) { n in
+                        Button("\(n)") { setLongEdge(n) }
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(t("Inainte: %d × %d px", Int(base.width), Int(base.height)))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                Text(t("Rezultat: %d × %d px", Int(output.width), Int(output.height)))
+                    .font(.callout)
+                    .monospacedDigit()
+                if output.width > base.width + 0.5 || output.height > base.height + 0.5 {
+                    Text(t("Marire: imaginea poate iesi mai putin clara."))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                if doc.stack.resize?.keepsAspect == true {
+                    Text(t("Imaginea incape in %d × %d px; o decupare facuta ulterior nu o deformeaza.",
+                           doc.stack.resize?.width ?? 0, doc.stack.resize?.height ?? 0))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Divider().padding(.vertical, 4)
+
+            HStack {
+                Button(t("Anuleaza")) { workspace.cancelTool() }
+                Spacer()
+                Button(t("Aplica")) { workspace.applyTool() }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!doc.sessionHasChanges)
+            }
+
+            Button {
+                doc.stack.resize = nil
+            } label: {
+                Text(t("Elimina redimensionarea"))
+                    .frame(maxWidth: .infinity)
+            }
+            .disabled(doc.stack.resize == nil)
+            .padding(.top, 4)
         }
     }
 
-    private var hasPendingChanges: Bool {
-        guard let snap = preToolSnap else { return false }
-        return snap != doc.stack
+    /// Store a target, or nothing when it is the size the image already has.
+    private func store(_ spec: ResizeSpec) {
+        let result = EditGeometry.resizedSize(spec, from: base)
+        if abs(result.width - base.width) < 0.5 && abs(result.height - base.height) < 0.5 {
+            doc.stack.resize = nil
+        } else {
+            doc.stack.resize = spec
+        }
     }
 
-    private func apply() {
-        if let snap = preToolSnap, snap != doc.stack {
-            doc.commitSnapshot(snap)
+    private func setWidth(_ w: Int) {
+        guard w > 0, base.width > 0 else { return }
+        if keepsAspect {
+            let h = max(1, Int((CGFloat(w) * base.height / base.width).rounded()))
+            store(ResizeSpec(width: w, height: h, keepsAspect: true))
+        } else {
+            store(ResizeSpec(width: w, height: Int(output.height), keepsAspect: false))
         }
-        preToolSnap = nil
-        tool = .hand
     }
 
-    private func cancel() {
-        if let snap = preToolSnap {
-            doc.stack = snap
+    private func setHeight(_ h: Int) {
+        guard h > 0, base.height > 0 else { return }
+        if keepsAspect {
+            let w = max(1, Int((CGFloat(h) * base.width / base.height).rounded()))
+            store(ResizeSpec(width: w, height: h, keepsAspect: true))
+        } else {
+            store(ResizeSpec(width: Int(output.width), height: h, keepsAspect: false))
         }
-        preToolSnap = nil
-        tool = .hand
     }
 
-    private func histogram(for image: NSImage) -> Histogram {
-        guard let ci = ImageRenderer.makeCIImage(from: image) else {
-            return .empty
+    private func setPercent(_ p: Double) {
+        guard p > 0 else { return }
+        let w = max(1, Int((base.width * p / 100).rounded()))
+        let h = max(1, Int((base.height * p / 100).rounded()))
+        store(ResizeSpec(width: w, height: h, keepsAspect: true))
+    }
+
+    /// A square box: the long side is `n` whatever the crop becomes later.
+    private func setLongEdge(_ n: Int) {
+        store(ResizeSpec(width: n, height: n, keepsAspect: true))
+    }
+
+    private func setKeepsAspect(_ on: Bool) {
+        let out = output
+        if on {
+            guard base.width > 0 else { return }
+            let w = Int(out.width)
+            let h = max(1, Int((CGFloat(w) * base.height / base.width).rounded()))
+            store(ResizeSpec(width: w, height: h, keepsAspect: true))
+        } else {
+            store(ResizeSpec(width: Int(out.width), height: Int(out.height), keepsAspect: false))
         }
-        return HistogramComputer.compute(from: ci) ?? .empty
+    }
+}
+
+/// "Result: W x H px" under the file size, when the edits change it.
+struct OutputSizeRow: View {
+    @ObservedObject var doc: OpenImage
+
+    var body: some View {
+        let out = EditGeometry.outputSize(for: doc.stack, sourceSize: doc.originalImage.size)
+        if Int(out.width) != Int(doc.originalImage.size.width)
+            || Int(out.height) != Int(doc.originalImage.size.height) {
+            Text(t("Rezultat: %d × %d px", Int(out.width), Int(out.height)))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
     }
 }
 
