@@ -199,6 +199,37 @@ enum XMPStack {
             md, nil, "\(prefix):\(name)" as CFString, tag)
     }
 
+    /// Everything Photo2Mac stores in a file, from ONE metadata parse.
+    /// Opening a mode-C file used to parse its XMP three times, and that XMP
+    /// carries a whole second image.
+    struct P2MRecord {
+        var stack: EditStack?
+        var strings: [String: String] = [:]
+    }
+
+    static func readRecord(from url: URL) -> P2MRecord {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let md = CGImageSourceCopyMetadataAtIndex(src, 0, nil),
+              let tags = CGImageMetadataCopyTags(md) as? [CGImageMetadataTag]
+        else { return P2MRecord() }
+        var record = P2MRecord()
+        for tag in tags {
+            guard (CGImageMetadataTagCopyNamespace(tag) as String?) == namespace,
+                  let name = CGImageMetadataTagCopyName(tag) as String?,
+                  let value = CGImageMetadataTagCopyValue(tag)
+            else { continue }
+            let str = (value as? String) ?? ((value as? NSString) as String?)
+            guard let str else { continue }
+            if name == propertyName {
+                record.stack = str.data(using: .utf8)
+                    .flatMap { try? JSONDecoder().decode(EditStack.self, from: $0) }
+            } else {
+                record.strings[name] = str
+            }
+        }
+        return record
+    }
+
     /// Read a p2m string property, or nil.
     static func readP2MString(_ name: String, from url: URL) -> String? {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -220,8 +251,6 @@ enum XMPStack {
         CGImageMetadataRegisterNamespaceForPrefix(
             md, xmpNS as CFString, xmpPrefix as CFString, nil)
         CGImageMetadataRegisterNamespaceForPrefix(
-            md, tiffNS as CFString, tiffPrefix as CFString, nil)
-        CGImageMetadataRegisterNamespaceForPrefix(
             md, dcNS as CFString, dcPrefix as CFString, nil)
 
         let appVersion = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)
@@ -229,10 +258,13 @@ enum XMPStack {
         let creatorTool = "Photo2Mac \(appVersion)"
         let description = humanDescription(of: stack, creator: creatorTool)
 
+        // dc:description only. Writing tiff:ImageDescription as well looks
+        // harmless, but in a PNG ImageIO merges the two into one text chunk and
+        // in doing so drops some of our own properties — measured: with both
+        // present and five p2m tags, p2m:originalSHA256 never reached the file.
+        // Viewers read the description from dc:description anyway.
         setStringTag(md, ns: xmpNS, prefix: xmpPrefix,
                      name: "CreatorTool", value: creatorTool)
-        setStringTag(md, ns: tiffNS, prefix: tiffPrefix,
-                     name: "ImageDescription", value: description)
         setStringTag(md, ns: dcNS, prefix: dcPrefix,
                      name: "description", value: description)
     }

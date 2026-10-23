@@ -230,6 +230,79 @@ final class GeometryTests: XCTestCase {
         XCTAssertTrue(isRed(px.at(0, 0)), "edge darkened: \(px.at(0, 0))")
     }
 
+    // MARK: - Embedded originals
+
+    /// A truncated embedded original must be refused, not adopted as "the
+    /// untouched original" and written over the photo on the next save.
+    func testTruncatedImageDataIsNotDecodable() throws {
+        let cg = try XCTUnwrap(quadrants().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        for type in [UTType.jpeg, UTType.png, UTType.heic] {
+            let url = try writeFile(cg, type: type)
+            let data = try Data(contentsOf: url)
+            XCTAssertTrue(SavedState.isDecodableImage(data), "\(type.identifier) whole")
+            XCTAssertFalse(SavedState.isDecodableImage(data.prefix(data.count * 2 / 3)),
+                           "\(type.identifier) truncated to 2/3 was accepted")
+        }
+    }
+
+    /// With a recorded hash, any change to the embedded original — even one
+    /// that still decodes — is caught.
+    func testEmbeddedOriginalIsCheckedAgainstItsHash() throws {
+        let cg = try XCTUnwrap(quadrants().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let data = try Data(contentsOf: try writeFile(cg, type: .png))
+        let hash = SavedState.sha256Hex(data)
+        XCTAssertTrue(SavedState.isTrustworthyOriginal(data, recordedHash: hash))
+        var other = data
+        other[other.count / 2] ^= 0xFF
+        XCTAssertFalse(SavedState.isTrustworthyOriginal(other, recordedHash: hash))
+    }
+
+    func testModeCFileWithATamperedOriginalOpensAsFlattened() throws {
+        let cg = try XCTUnwrap(quadrants().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let original = try Data(contentsOf: try writeFile(cg, type: .png))
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("p2m-tamper-\(UUID().uuidString).png")
+        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        var stack = EditStack()
+        stack.rotateDegrees = 90
+        XCTAssertTrue(XMPStack.write(
+            stack: stack, image: cg, to: url, utiType: UTType.png.identifier as CFString,
+            extraTags: [
+                SavedState.modeProperty: SaveMode.embeddedOriginal.rawValue,
+                SavedState.originalProperty: original.base64EncodedString(),
+                SavedState.originalHashProperty: String(repeating: "0", count: 64),
+            ]))
+        guard case .flattened = SavedState.resolve(for: url) else {
+            return XCTFail("an original that fails its hash was trusted")
+        }
+    }
+
+    /// Every property a mode-C save writes must come back, in every format we
+    /// write. In PNG, ImageIO used to drop one of them.
+    func testAllP2MPropertiesSurviveEveryFormat() throws {
+        let cg = try XCTUnwrap(quadrants().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let tags = [
+            SavedState.modeProperty: SaveMode.embeddedOriginal.rawValue,
+            SavedState.originalProperty: Data(repeating: 7, count: 3000).base64EncodedString(),
+            SavedState.originalTypeProperty: "public.png",
+            SavedState.originalHashProperty: String(repeating: "ab", count: 32),
+        ]
+        var stack = EditStack()
+        stack.rotateDegrees = 12
+        for type in [UTType.png, UTType.jpeg, UTType.heic, UTType.tiff] {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("p2m-tags-\(UUID().uuidString).\(type.preferredFilenameExtension ?? "img")")
+            addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+            XCTAssertTrue(XMPStack.write(stack: stack, image: cg, to: url,
+                                         utiType: type.identifier as CFString, extraTags: tags))
+            let record = XMPStack.readRecord(from: url)
+            XCTAssertEqual(record.stack, stack, type.identifier)
+            for (k, v) in tags {
+                XCTAssertEqual(record.strings[k], v, "\(type.identifier) lost p2m:\(k)")
+            }
+        }
+    }
+
     // MARK: - Stack format
 
     /// Stacks written before crop basis and resize existed must still open.

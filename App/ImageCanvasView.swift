@@ -806,6 +806,14 @@ struct ImageCanvasView: NSViewRepresentable {
                 }
                 coord.fittedDocumentID = nil
                 coord.userInteracted = false
+                // A freshly shown document takes the keyboard (arrows page
+                // through the folder) unless the user is typing somewhere.
+                DispatchQueue.main.async { [weak canvas] in
+                    guard let canvas, let window = canvas.window else { return }
+                    if !(window.firstResponder is NSTextView) {
+                        window.makeFirstResponder(canvas)
+                    }
+                }
             } else if oldSize != image.size {
                 // Same document, different geometry (crop applied, crop tool
                 // showing the uncropped image, before/after). The padding was

@@ -148,6 +148,8 @@ enum SaveService {
                 originalBytes.base64EncodedString()
             extraTags[SavedState.originalTypeProperty] =
                 (XMPStack.utiType(for: doc.url) as String?) ?? ""
+            extraTags[SavedState.originalHashProperty] =
+                SavedState.sha256Hex(originalBytes)
         }
 
         let ok = XMPStack.write(

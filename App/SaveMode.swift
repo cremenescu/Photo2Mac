@@ -4,6 +4,7 @@
 import Foundation
 import AppKit
 import ImageIO
+import CryptoKit
 
 /// What Cmd+S does to the file on disk.
 ///
@@ -128,31 +129,51 @@ enum SavedState {
     /// wrapped at multiples of 4, so the truncation stays decodable and would
     /// otherwise be adopted as "the untouched original" and written over the
     /// photo on the next save.
+    ///
+    /// Files written since v0.3.0 carry a SHA-256 of the original, which
+    /// settles it cheaply and exactly. This is the fallback for files without
+    /// one, and it has to decode the pixels: ImageIO reports a truncated PNG
+    /// as complete and even hands out a CGImage for it — only reading the
+    /// pixels fails.
     static func isDecodableImage(_ data: Data) -> Bool {
         guard let src = CGImageSourceCreateWithData(data as CFData, nil),
               CGImageSourceGetType(src) != nil,
               CGImageSourceGetCount(src) > 0,
-              CGImageSourceCreateImageAtIndex(src, 0, nil) != nil
+              let image = CGImageSourceCreateImageAtIndex(src, 0, nil),
+              let pixels = image.dataProvider?.data,
+              CFDataGetLength(pixels) > 0
         else { return false }
         return true
+    }
+
+    static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Whether `data` is the original the file says it embedded.
+    static func isTrustworthyOriginal(_ data: Data, recordedHash: String?) -> Bool {
+        if let recordedHash { return sha256Hex(data) == recordedHash }
+        return isDecodableImage(data)
     }
 
     /// Property names used in XMP.
     static let modeProperty = "saveMode"
     static let originalProperty = "originalImage"
     static let originalTypeProperty = "originalType"
+    static let originalHashProperty = "originalSHA256"
 
     static func resolve(for url: URL) -> SavedState {
-        let recorded = XMPStack.read(from: url)
-        let mode = XMPStack.readP2MString(modeProperty, from: url)
+        let record = XMPStack.readRecord(from: url)
+        let recorded = record.stack
+        let mode = record.strings[modeProperty]
 
         // 1. The file's own marker is consulted FIRST. A sidecar sitting next
         //    to a file that was written with baked pixels is stale — trusting
         //    it would apply a stack the pixels already contain.
         if mode == SaveMode.embeddedOriginal.rawValue,
-           let b64 = XMPStack.readP2MString(originalProperty, from: url),
+           let b64 = record.strings[originalProperty],
            let data = Data(base64Encoded: b64),
-           isDecodableImage(data),
+           isTrustworthyOriginal(data, recordedHash: record.strings[originalHashProperty]),
            let stack = recorded {
             return .editable(stack: stack, originalData: data)
         }
