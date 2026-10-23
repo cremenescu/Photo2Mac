@@ -40,7 +40,7 @@ enum SaveMode: String, CaseIterable, Identifiable, Codable {
     var explanation: String {
         switch self {
         case .flattened:
-            return t("Fisierul devine imaginea editata, ca in Preview. Alte aplicatii vad editarile. Poti recupera versiunea dinainte din Fisier > Revino la.")
+            return t("Fisierul devine imaginea editata, ca in Preview. Alte aplicatii vad editarile. macOS pastreaza versiunea dinainte: o recuperezi deschizand fisierul in Preview, Fisier > Revino la.")
         case .sidecar:
             return t("Fisierul original ramane neatins; editarile stau intr-un fisier .p2m alaturi. Reversibil oricand, dar alte aplicatii vad originalul needitat — foloseste Salveaza ca... ca sa obtii imaginea editata.")
         case .embeddedOriginal:

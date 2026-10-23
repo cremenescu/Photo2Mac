@@ -106,36 +106,40 @@ struct HelpView: View {
                 header
                 Divider()
                 section(title: t("Ce este Photo2Mac"), body: [
-                    t("Photo2Mac este un editor de imagini nativ macOS, simplu si rapid. Modelul de editare este nedistructiv: pixelii originali nu se modifica decat la salvare; pana atunci, fiecare ajustare (decupare, rotire, flip, luminozitate, contrast, saturatie, expunere) e doar o instructiune in stiva de editari, randata live prin Core Image."),
-                    t("Stiva de editari se salveaza in metadata XMP a fisierului — deschiderea aceluiasi fisier in Photo2Mac restaureaza editarile (le poti modifica). Alte aplicatii vad doar pixelii randati.")
+                    t("Photo2Mac este un editor de imagini nativ macOS, simplu si rapid. Editarea e nedistructiva: decuparea, rotirea, oglindirea, ajustarile si redimensionarea sunt pasi intr-o stiva de editari, randata live prin Core Image; pixelii se schimba abia la salvare."),
+                    t("Ce face Cmd+S alegi in Preferinte > Salvare: fisierul devine imaginea editata, originalul ramane neatins cu editarile intr-un fisier .p2m alaturi, sau fisierul editat poarta originalul in interior. In ultimele doua cazuri, redeschiderea in Photo2Mac aduce inapoi editarile, pe care le poti modifica.")
                 ])
                 section(title: t("Cum incepi"), body: [
-                    t("File → Open image... (Cmd+O), drag-and-drop pe fereastra, sau alege o imagine recenta din ecranul de pornire."),
-                    t("Imaginile deschise apar ca tab-uri in partea de sus. Cmd+W inchide tab-ul curent, Cmd+Shift+W inchide fereastra (app-ul ramane viu).")
+                    t("Fisier > Deschide imagine... (Cmd+O), trage o imagine pe fereastra sau alege una recenta din ecranul de pornire."),
+                    t("Imaginile deschise apar ca taburi; un punct langa nume inseamna modificari nesalvate. Cmd+W inchide tabul, iar inchiderea ultimului tab sau a ferestrei inchide aplicatia. Daca ai modificari nesalvate, esti intrebat inainte."),
+                    t("Sagetile stanga / dreapta (dupa un click pe imagine) sau Cmd+[ / Cmd+] deschid imaginea anterioara / urmatoare din acelasi dosar. Tabul curent e inlocuit doar daca nu are modificari nesalvate.")
                 ])
-                section(title: t("Tool-uri"), body: [
-                    t("Mutare: mut imaginea in workspace (click-drag sau scroll trackpad)."),
-                    t("Decupare: dreptunghi de selectie cu colt-handles + edge-handles. Picker pentru raport (Original, 1:1, 4:3, ..., Liber). Apply commit-uieste."),
-                    t("Rotire: presets ±90°, slider 0.01° + text field pentru unghi precis, Flip H/V."),
-                    t("Ajustari: histograma live (Luminanta/RGB/R/G/B) + sliders pentru Luminozitate, Contrast, Saturatie, Expunere."),
-                    t("Metadate: vezi EXIF (camera, ISO, expunere, etc.) si statusul XMP-ului Photo2Mac (JSON brut optional).")
+                section(title: t("Unelte"), body: [
+                    t("Mutare: muti imaginea (click-drag sau scroll pe trackpad), pinch pentru zoom."),
+                    t("Decupare: dreptunghi cu manere in colturi si pe laturi, raport fix sau liber. Return aplica, Escape renunta, si cu inspectorul ascuns. Decuparea ramane pe acelasi subiect daca rotesti imaginea dupa aceea."),
+                    t("Rotire: ±90°, unghi fin cu pas de 0,01° (slider, camp sau doua degete pe trackpad) si oglindire orizontala / verticala a imaginii asa cum o vezi."),
+                    t("Ajustari: histograma live (Luminanta / RGB / R / G / B) si Luminozitate, Contrast, Saturatie, Expunere."),
+                    t("Redimensionare: latime si inaltime in pixeli sau procent, cu proportiile pastrate, plus latura lunga 1920 / 1200 / 800. Se aplica ultima, deci o poti schimba sau scoate oricand."),
+                    t("Metadate: EXIF (camera, ISO, expunere etc.) si ce a scris Photo2Mac in XMP."),
+                    t("Inainte / dupa: tine apasat butonul din toolbar sau tasta \\ ca sa vezi originalul.")
                 ])
-                section(title: t("Save / persistare"), body: [
-                    t("Cmd+S scrie peste fisierul deschis: pixeli randati + stack EditStack ca XMP. macOS retine si o versiune anterioara prin NSFileVersion."),
-                    t("Cmd+Shift+S = Save As cu panel."),
-                    t("Daca inchizi tab-ul fara save, editarile se pastreaza intr-un autosave invisible (App Support); la reopen primesti prompt pentru a continua sau renunta.")
+                section(title: t("Salvare"), body: [
+                    t("Cmd+S salveaza peste fisier, in modul ales in Preferinte. macOS pastreaza si versiunea dinainte; o recuperezi deschizand fisierul in Preview, Fisier > Revino la."),
+                    t("Cmd+Shift+S salveaza intr-un fisier nou, iar documentul trece pe fisierul nou."),
+                    t("Cmd+Shift+E exporta o copie: alegi formatul (JPEG, PNG, HEIC, TIFF), calitatea si o latura maxima. Documentul ramane cum era."),
+                    t("Editarile nesalvate sunt pastrate automat. Daca aplicatia se inchide neasteptat, la redeschiderea imaginii esti intrebat daca le continui; daca fisierul s-a schimbat intre timp, nu ti le mai propune.")
                 ])
                 xmpSection
                 section(title: t("Scurtaturi"), body: shortcutsList)
                 section(title: t("Sfaturi"), body: [
-                    t("La Crop, intrarea in tool reduce zoom-ul cu 10% ca sa ai loc sa apuci colturile."),
-                    t("La Tune/Rotate, sliderele coaleseaza intr-o singura actiune in stiva undo (Cmd+Z anuleaza intreg drag-ul, nu fiecare pixel)."),
-                    t("Butonul Edits din toolbar arata lista de editari aplicate cu X per item pentru revert selectiv.")
+                    t("In Rotire, Ajustari si Redimensionare, tot ce faci pana la Aplica e un singur pas de undo (Cmd+Z)."),
+                    t("Butonul Editari din toolbar arata lista editarilor aplicate; X scoate doar pasul respectiv."),
+                    t("La intrarea in Decupare zoom-ul scade cu 10%, ca sa ajungi usor la colturi.")
                 ])
                 section(title: t("Limitari curente"), body: [
-                    t("Faza 2 (urmatoare): anotari vector (text/sageata/dreptunghi/blur), batch processor, organize/browse, screenshot capture, RAW."),
-                    t("Aspect ratio Original = ratio-ul nativ al imaginii curente."),
-                    t("CMYK histogram in pauza (cere ICC color management corect).")
+                    t("Urmeaza: anotari (text, sageata, dreptunghi, blur), procesare in lot, RAW."),
+                    t("Salvarea scrie 8 biti pe canal: o imagine de 16 biti pierde adancimea de culoare la salvare."),
+                    t("Raportul Original = raportul imaginii asa cum arata dupa rotire.")
                 ])
                 Divider()
                 links
@@ -167,10 +171,14 @@ struct HelpView: View {
             "Cmd+O — \(t("deschide imagine"))",
             "Cmd+S — \(t("salveaza peste fisier"))",
             "Cmd+Shift+S — \(t("salveaza ca"))",
+            "Cmd+Shift+E — \(t("exporta o copie"))",
             "Cmd+W — \(t("inchide tab"))",
             "Cmd+Shift+W — \(t("inchide fereastra"))",
             "Cmd+Z — \(t("anuleaza ultima actiune"))",
             "Cmd+Shift+Z — \(t("refa"))",
+            "Cmd+[ / Cmd+], ← / → — \(t("imaginea anterioara / urmatoare din dosar"))",
+            "Return / Escape — \(t("aplica / renunta in unealta curenta"))",
+            "\\ — \(t("tine apasat: originalul"))",
             "Cmd+, — \(t("preferinte"))",
         ]
     }
@@ -213,7 +221,7 @@ struct HelpView: View {
                     Text(verbatim: "p2m:editStack").font(.system(.callout, design: .monospaced))
                 }
             }
-            Text(t("Containere: JPEG (APP1), PNG (iTXt), HEIC (meta box), TIFF (tag 700). Se mai scriu si xmp:CreatorTool + tiff:ImageDescription + dc:description (rezumat in engleza), ca metadata sa fie vizibila in orice viewer (Preview, exiftool, Bridge, Get Info)."))
+            Text(t("Containere: JPEG (APP1), PNG (iTXt), HEIC (meta box), TIFF (tag 700). Se mai scriu xmp:CreatorTool si dc:description (rezumat in engleza), ca editarile sa se vada in orice viewer (Preview, exiftool, Bridge, Get Info). Alaturi: p2m:saveMode (cum a fost scris fisierul) si, in modul care pastreaza originalul, p2m:originalImage, p2m:originalType si p2m:originalSHA256."))
                 .fixedSize(horizontal: false, vertical: true)
             Text(verbatim: """
 {
@@ -222,10 +230,13 @@ struct HelpView: View {
   "flipVertical": false,
   "crop": { "x": 0.05, "y": 0.10,
             "width": 0.90, "height": 0.80 },
+  "cropBasisDegrees": -2.5,
   "adjustments": {
     "brightness": 0.12, "contrast": 0.05,
     "saturation": 0,    "exposure": 0.30
-  }
+  },
+  "resize": { "width": 1920, "height": 1920,
+              "keepsAspect": true }
 }
 """)
                 .font(.system(.callout, design: .monospaced))
@@ -234,7 +245,7 @@ struct HelpView: View {
                 .background(Color.secondary.opacity(0.1))
                 .cornerRadius(6)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(t("Ordine de randare: flipH → flipV → rotate → crop → adjustments. Crop-ul lucreaza pe cadrul rotit/flipped, ajustarile pe regiunea decupata."))
+            Text(t("Ordine de randare: flipH → flipV → rotate → crop → adjustments → resize. Crop-ul lucreaza pe cadrul rotit, la unghiul din cropBasisDegrees; ajustarile pe regiunea decupata; resize pe rezultat."))
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 14) {
                 Link(t("Documentatie completa (docs/XMP.md)"),

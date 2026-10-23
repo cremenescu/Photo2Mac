@@ -13,18 +13,19 @@ A native macOS image editor — simple, fast, **non-destructive**.
 
 ## Status
 
-In development — `v0.2.1-alpha` (phase 1: single-image editor).
+In development — `v0.3.0-alpha` (phase 1: single-image editor).
 
 The pixels of the original file are never touched until you Save. Every
 adjustment (crop, rotate, flip, brightness, contrast, saturation,
-exposure) lives on an `EditStack` that is rendered live by Core Image.
+exposure, resize) lives on an `EditStack` that is rendered live by Core
+Image.
 
 What Save then does to the file is **your choice**, in Settings, because
 the honest answers differ:
 
 | Mode | Cmd+S writes | Other apps see | Can you undo it later? |
 |------|--------------|----------------|------------------------|
-| **Save what you see** (default) | the edited image | your edits | via File ▸ Revert To (macOS versions) |
+| **Save what you see** (default) | the edited image | your edits | open the file in Preview, File ▸ Revert To (macOS keeps the previous version) |
 | **Never modify the original** | a `.p2m` file beside it | the *unedited* original | yes, always |
 | **Keep the original inside** | the edited image, carrying the original | your edits | yes, always (file is ~2× larger) |
 
@@ -51,24 +52,36 @@ Saving preserves the source's EXIF, GPS, copyright and colour profile.
 - **Non-destructive editing** with a live Core Image pipeline (Metal-
   backed).
 - **Crop** with 8 handles (corners + edges) and an aspect-ratio picker
-  (Original, 1:1, 4:3, 3:2, 16:9, ..., Free).
-- **Rotate** with ±90° presets, a 0.01° slider and a precise angle field;
-  **Flip** H / V.
+  (Original, 1:1, 4:3, 3:2, 16:9, ..., Free). Return applies, Escape
+  cancels. A crop stays on its subject when you rotate afterwards.
+- **Rotate** with ±90° presets, a 0.01° slider, a precise angle field and
+  two-finger trackpad rotation; **Flip** H / V of the image as displayed.
 - **Tune** with brightness / contrast / saturation / exposure sliders
   and a live histogram (Luminance / RGB / R / G / B).
+- **Resize** to pixels or a percentage, with proportions kept, and
+  long-edge presets (1920 / 1200 / 800). It is the last step of the stack,
+  so it can be changed or removed at any time.
+- **Before / after**: hold the toolbar button or the `\` key.
 - **Edits list** popover in the toolbar, with per-row revert.
 - **Save** (Cmd+S) in one of three modes, chosen in Settings (see the
-  table above); **Save As** (Cmd+Shift+S) prompts for a destination.
-  Source EXIF, GPS, copyright and ICC profile are carried across.
-- **Invisible autosave** in `~/Library/Application Support/Photo2Mac/`
-  so unsaved edits survive a tab close.
+  table above); **Save As** (Cmd+Shift+S) moves the document to the new
+  file; **Export** (Cmd+Shift+E) writes a copy in JPEG, PNG, HEIC or TIFF
+  with a chosen quality and maximum size. Source EXIF, GPS, copyright and
+  ICC profile are carried across.
+- **Unsaved changes** show as a dot in the tab; closing a tab, the window
+  or the app asks first. Unsaved edits are also autosaved in
+  `~/Library/Application Support/Photo2Mac/` and offered back after a
+  crash, as long as the file has not changed since.
+- **Folder paging**: ← / → on the image, or Cmd+[ / Cmd+], opens the
+  previous / next image in the same folder.
 - **Welcome screen** with recent files, **Metadata viewer** (EXIF +
   Photo2Mac XMP status).
 - **Bilingual UI** (English default + Romanian), switchable in
   Settings.
 - **Custom About panel + Help window** (Cmd+?).
 
-Formats: JPEG, PNG, HEIC, TIFF (RAW is on the roadmap).
+Formats: opens JPEG, PNG, HEIC, TIFF, WebP and AVIF; saves JPEG, PNG, HEIC
+and TIFF (RAW is on the roadmap). Saving writes 8 bits per channel.
 
 ## Roadmap (phase 2+)
 
@@ -94,20 +107,13 @@ xcodegen`).
 To produce a self-contained `.dmg`:
 
 ```bash
-./build/package.sh v0.1.0-alpha
+./build/package.sh v0.3.0-alpha
 ```
 
 ## Installation (from a release `.dmg`)
 
-The `.dmg` is **ad-hoc signed** (no Apple Developer ID yet), so Gatekeeper
-will refuse to launch it on the first try. After dragging the app into
-`/Applications`:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/Photo2Mac.app
-```
-
-Then double-click as usual.
+The `.dmg` is signed with a Developer ID and notarized by Apple. Open it,
+drag Photo2Mac into `/Applications` and launch it as usual.
 
 ## License
 
