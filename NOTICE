@@ -13,3 +13,13 @@ This product includes or links to third-party software:
    License: MIT License
    A subset of SVG icons is bundled under App/Resources/Icons/.
 ================================================================================
+
+2. Sparkle
+   Source: https://github.com/sparkle-project/Sparkle
+   Copyright (c) 2006-2013 Andy Matuschak, 2009-2013 Elgato Systems GmbH,
+   2011-2014 Kornel Lesiński, 2015-2017 Mayur Pawashe, 2014 C.W. Betts,
+   2014 Petroules Corporation, 2014 Big Nerd Ranch, and contributors.
+   License: MIT License (with bundled third-party components under their own
+   permissive licenses, listed in Sparkle's LICENSE file)
+   Embedded as Sparkle.framework for automatic updates.
+================================================================================

@@ -7,6 +7,8 @@ import UniformTypeIdentifiers
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Starts Sparkle, which schedules its daily check.
+        _ = AppUpdater.shared
         NSWindow.allowsAutomaticWindowTabbing = false
         for window in NSApp.windows {
             window.tabbingMode = .disallowed

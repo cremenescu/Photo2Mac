@@ -79,6 +79,10 @@ Saving preserves the source's EXIF, GPS, copyright and colour profile.
 - **Bilingual UI** (English default + Romanian), switchable in
   Settings.
 - **Custom About panel + Help window** (Cmd+?).
+- **Automatic updates** (Sparkle): one check a day against a feed on
+  cremenescu.ro, installed only after you accept; switch it off in Settings.
+  It is the only network request the app makes and sends nothing about you
+  or your Mac.
 
 Formats: opens JPEG, PNG, HEIC, TIFF, WebP and AVIF; saves JPEG, PNG, HEIC
 and TIFF (RAW is on the roadmap). Saving writes 8 bits per channel.

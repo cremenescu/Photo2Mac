@@ -10,15 +10,19 @@
 #
 # Steps:
 #  1. xcodebuild Release.
-#  2. Sign the app with the Developer ID, hardened runtime and a secure
-#     timestamp. No entitlements: the app needs no runtime exception.
-#     Falls back to ad-hoc signing when the certificate is not present.
+#  2. Sign Sparkle's nested helpers, then the app, with the Developer ID,
+#     hardened runtime and a secure timestamp. No entitlements: the app needs
+#     no runtime exception. Falls back to ad-hoc signing when the certificate
+#     is not present.
 #  3. Wrap into a drag-to-Applications .dmg.
 #  4. Sign the .dmg, notarize it, staple the ticket and check it the way
 #     Gatekeeper will on someone else's Mac. Skipped on ad-hoc builds.
+#  5. Write the Sparkle appcast for this release (.dist/photo2mac-appcast.xml),
+#     to be copied to cremenescu.ro/assets/. RELEASE_NOTES_HTML=<file> embeds
+#     release notes in it.
 #
 # Usage: ./build/package.sh [version]
-#   version defaults to v0.3.0-alpha
+#   version defaults to v0.3.1-alpha
 #
 #   DEVELOPER_ID="-"   ad-hoc build, no Apple identity at all
 #   SKIP_NOTARIZE=1    sign with the Developer ID but do not send it to Apple
@@ -30,7 +34,7 @@
 
 set -euo pipefail
 
-VERSION="${1:-v0.3.0-alpha}"
+VERSION="${1:-v0.3.1-alpha}"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/.build-release"
 DIST_DIR="$PROJECT_ROOT/.dist"
@@ -91,6 +95,21 @@ fi
 
 if [ "$SIGN_MODE" = "developer-id" ]; then
     echo "==> Signing with $DEVELOPER_ID (hardened runtime)"
+    # Sparkle.framework arrives ad-hoc signed from Xcode. Its XPC services and
+    # helper tools must be re-signed with our identity, deepest first and the
+    # framework last, or notarization rejects the nested code. No --deep: it
+    # would strip the Downloader XPC's own entitlement. The versioned
+    # directory is "B" (Sparkle's current framework version).
+    SPARKLE_FW="$APP_DST/Contents/Frameworks/Sparkle.framework"
+    if [ -d "$SPARKLE_FW" ]; then
+        for item in XPCServices/Installer.xpc XPCServices/Downloader.xpc Autoupdate Updater.app; do
+            extra=()
+            [ "$item" = "XPCServices/Downloader.xpc" ] && extra=(--preserve-metadata=entitlements)
+            codesign --force --sign "$DEVELOPER_ID" --options runtime --timestamp \
+                     ${extra[@]+"${extra[@]}"} "$SPARKLE_FW/Versions/B/$item"
+        done
+        codesign --force --sign "$DEVELOPER_ID" --options runtime --timestamp "$SPARKLE_FW"
+    fi
     codesign --force --sign "$DEVELOPER_ID" --options runtime --timestamp "$APP_DST"
 else
     echo "==> Developer ID not available — signing ad-hoc"
@@ -136,6 +155,33 @@ if [ "$SIGN_MODE" = "developer-id" ]; then
 
     echo "==> Verifying with Gatekeeper"
     spctl --assess --type open --context context:primary-signature -vv "$DIST_DIR/$DMG_NAME"
+
+    # Sparkle appcast: generate_appcast signs the notarized DMG with the
+    # EdDSA private key from the login keychain and writes the feed. The
+    # enclosure points at this tag's GitHub release asset; the trailing slash
+    # on the prefix is mandatory. It reads CFBundleVersion from the app inside
+    # the DMG, so that must grow with every release. The file is named after
+    # the SUFeedURL basename, so whatever xml it wrote is the feed.
+    SPARKLE_BIN="$BUILD_DIR/SourcePackages/artifacts/sparkle/Sparkle/bin"
+    if [ -x "$SPARKLE_BIN/generate_appcast" ]; then
+        echo "==> Generating Sparkle appcast"
+        APPCAST_DIR="$DIST_DIR/appcast"
+        rm -rf "$APPCAST_DIR"; mkdir -p "$APPCAST_DIR"
+        cp "$DIST_DIR/$DMG_NAME" "$APPCAST_DIR/"
+        NOTES_ARGS=()
+        if [ -n "${RELEASE_NOTES_HTML:-}" ]; then
+            cp "$RELEASE_NOTES_HTML" "$APPCAST_DIR/${DMG_NAME%.dmg}.html"
+            NOTES_ARGS=(--embed-release-notes)
+        fi
+        "$SPARKLE_BIN/generate_appcast" ${NOTES_ARGS[@]+"${NOTES_ARGS[@]}"} \
+            --download-url-prefix "https://github.com/cremenescu/Photo2Mac/releases/download/$VERSION/" \
+            "$APPCAST_DIR"
+        cp "$APPCAST_DIR"/*.xml "$DIST_DIR/photo2mac-appcast.xml"
+        echo "    appcast -> $DIST_DIR/photo2mac-appcast.xml"
+        echo "    Copy it to cremenescu.ro-site/public/assets/ and deploy (matches SUFeedURL)."
+    else
+        echo "WARN: generate_appcast not found at $SPARKLE_BIN — appcast NOT generated" >&2
+    fi
 fi
 
 ls -lh "$DIST_DIR/$DMG_NAME"

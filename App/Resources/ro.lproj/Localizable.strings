@@ -272,3 +272,11 @@
 "imaginea anterioara / urmatoare din dosar" = "imaginea anterioara / urmatoare din dosar";
 "aplica / renunta in unealta curenta" = "aplica / renunta in unealta curenta";
 "tine apasat: originalul" = "tine apasat: originalul";
+
+// v0.3.1 updates
+"Cauta actualizari..." = "Cauta actualizari...";
+"Actualizari" = "Actualizari";
+"Cauta automat actualizari (o data pe zi)" = "Cauta automat actualizari (o data pe zi)";
+"Cauta acum" = "Cauta acum";
+"Verificarea citeste lista de versiuni de pe cremenescu.ro si nu trimite nimic despre tine sau despre Mac. O actualizare se instaleaza doar dupa ce o accepti." = "Verificarea citeste lista de versiuni de pe cremenescu.ro si nu trimite nimic despre tine sau despre Mac. O actualizare se instaleaza doar dupa ce o accepti.";
+"Photo2Mac cauta o versiune noua o data pe zi si o instaleaza doar dupa ce accepti. Verificarea se opreste din Preferinte > Actualizari, iar Photo2Mac > Cauta actualizari... o face la cerere." = "Photo2Mac cauta o versiune noua o data pe zi si o instaleaza doar dupa ce accepti. Verificarea se opreste din Preferinte > Actualizari, iar Photo2Mac > Cauta actualizari... o face la cerere.";

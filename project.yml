@@ -5,11 +5,16 @@ options:
     macOS: "14.0"
   createIntermediateGroups: true
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: "2.9.4"
+
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.3.0"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "0.3.1"
+    CURRENT_PROJECT_VERSION: "5"
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
     GENERATE_INFOPLIST_FILE: NO
@@ -32,6 +37,9 @@ targets:
       - App
     resources:
       - App/Resources
+    dependencies:
+      - package: Sparkle
+        product: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ro.cremenescu.Photo2Mac
@@ -58,6 +66,18 @@ targets:
         NSHumanReadableCopyright: "Copyright (c) 2026 Razvan Cremenescu. GPL-2.0-or-later."
         NSHighResolutionCapable: true
         CFBundleIconFile: AppIcon
+        # Sparkle auto-update, as in mRemoteNXT. The feed (appcast) lives on
+        # cremenescu.ro; the DMGs it points at are GitHub release assets.
+        # SUPublicEDKey is the EdDSA public key shared with mRemoteNXT (the
+        # private key lives only in the build machine's login keychain). One
+        # check a day; an update is installed only after the user agrees, and
+        # no system profile is ever sent.
+        SUFeedURL: "https://cremenescu.ro/assets/photo2mac-appcast.xml"
+        SUPublicEDKey: "H3Hm6zo4EVt4Dva4QV1/+HLK1c9ajCvl/pApbxsTAvU="
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+        SUAutomaticallyUpdate: false
+        SUEnableSystemProfiling: false
         CFBundleDocumentTypes:
           - CFBundleTypeName: Image
             CFBundleTypeRole: Editor

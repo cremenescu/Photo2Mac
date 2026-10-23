@@ -64,6 +64,10 @@ La salvare se pastreaza EXIF, GPS, copyright si profilul de culoare.
   starea XMP Photo2Mac).
 - **Interfata bilingva** (engleza implicit + romana), din Preferinte.
 - **Panou Despre + fereastra de ajutor** (Cmd+?).
+- **Actualizari automate** (Sparkle): o verificare pe zi, pe o lista de pe
+  cremenescu.ro, instalare doar dupa ce accepti; se opreste din Preferinte.
+  E singura cerere de retea a aplicatiei si nu trimite nimic despre tine sau
+  despre Mac.
 
 Formate: deschide JPEG, PNG, HEIC, TIFF, WebP si AVIF; salveaza JPEG, PNG,
 HEIC si TIFF (RAW urmeaza). Salvarea scrie 8 biti pe canal.

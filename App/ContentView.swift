@@ -1576,6 +1576,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            UpdatesSection()
             Section(t("Limba")) {
                 Picker(t("Limba aplicatiei"), selection: Binding(
                     get: { LanguageManager.shared.choice },
@@ -1611,6 +1612,23 @@ struct SettingsView: View {
             Text(t("macOS poate cere o singura confirmare la prima schimbare. Pentru a reveni la aplicatia anterioara, foloseste Finder > Get Info > Open With."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Automatic update checks. The only network request Photo2Mac makes.
+private struct UpdatesSection: View {
+    @StateObject private var model = UpdaterViewModel()
+
+    var body: some View {
+        Section(t("Actualizari")) {
+            Toggle(t("Cauta automat actualizari (o data pe zi)"), isOn: $model.automaticallyChecks)
+            Button(t("Cauta acum")) { model.checkForUpdates() }
+                .disabled(!model.canCheckForUpdates)
+            Text(t("Verificarea citeste lista de versiuni de pe cremenescu.ro si nu trimite nimic despre tine sau despre Mac. O actualizare se instaleaza doar dupa ce o accepti."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

@@ -134,7 +134,8 @@ struct HelpView: View {
                 section(title: t("Sfaturi"), body: [
                     t("In Rotire, Ajustari si Redimensionare, tot ce faci pana la Aplica e un singur pas de undo (Cmd+Z)."),
                     t("Butonul Editari din toolbar arata lista editarilor aplicate; X scoate doar pasul respectiv."),
-                    t("La intrarea in Decupare zoom-ul scade cu 10%, ca sa ajungi usor la colturi.")
+                    t("La intrarea in Decupare zoom-ul scade cu 10%, ca sa ajungi usor la colturi."),
+                    t("Photo2Mac cauta o versiune noua o data pe zi si o instaleaza doar dupa ce accepti. Verificarea se opreste din Preferinte > Actualizari, iar Photo2Mac > Cauta actualizari... o face la cerere.")
                 ])
                 section(title: t("Limitari curente"), body: [
                     t("Urmeaza: anotari (text, sageata, dreptunghi, blur), procesare in lot, RAW."),
@@ -277,6 +278,7 @@ struct AboutHelpCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button(t("Despre Photo2Mac")) { AboutPanel.show() }
+            CheckForUpdatesView()
         }
         CommandGroup(replacing: .help) {
             Button(t("Ajutor Photo2Mac")) { HelpWindow.shared.show() }

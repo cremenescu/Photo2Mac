@@ -56,5 +56,17 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright (c) 2026 Razvan Cremenescu. GPL-2.0-or-later.</string>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://cremenescu.ro/assets/photo2mac-appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>H3Hm6zo4EVt4Dva4QV1/+HLK1c9ajCvl/pApbxsTAvU=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

@@ -291,3 +291,11 @@
 "imaginea anterioara / urmatoare din dosar" = "previous / next image in the folder";
 "aplica / renunta in unealta curenta" = "apply / cancel in the current tool";
 "tine apasat: originalul" = "hold: the original";
+
+// MARK: - v0.3.1 updates
+"Cauta actualizari..." = "Check for Updates...";
+"Actualizari" = "Updates";
+"Cauta automat actualizari (o data pe zi)" = "Check for updates automatically (once a day)";
+"Cauta acum" = "Check Now";
+"Verificarea citeste lista de versiuni de pe cremenescu.ro si nu trimite nimic despre tine sau despre Mac. O actualizare se instaleaza doar dupa ce o accepti." = "The check reads the list of versions from cremenescu.ro and sends nothing about you or your Mac. An update is installed only after you accept it.";
+"Photo2Mac cauta o versiune noua o data pe zi si o instaleaza doar dupa ce accepti. Verificarea se opreste din Preferinte > Actualizari, iar Photo2Mac > Cauta actualizari... o face la cerere." = "Photo2Mac looks for a new version once a day and installs it only after you accept. Turn the check off in Settings > Updates; Photo2Mac > Check for Updates... runs it on demand.";
